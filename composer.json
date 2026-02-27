@@ -1,0 +1,34 @@
+{
+    "name": "codebes/gripp-sdk",
+    "description": "PHP SDK for the Gripp API",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "CodeBes"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "guzzlehttp/guzzle": "^7.0",
+        "illuminate/support": "^10.0|^11.0|^12.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "CodeBes\\GrippSdk\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "CodeBes\\GrippSdk\\Tests\\": "tests/"
+        }
+    },
+    "bin": [
+        "bin/gripp-setup"
+    ],
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

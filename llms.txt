@@ -1,0 +1,96 @@
+# Gripp SDK for PHP
+
+> PHP SDK for the Gripp business management API. Provides a fluent, static interface to perform CRUD operations on 54 Gripp resources via JSON-RPC.
+
+## Package
+
+- Composer: `codebes/gripp-sdk`
+- Namespace: `CodeBes\GrippSdk`
+- PHP: 8.1+
+- Dependencies: guzzlehttp/guzzle ^7.0, illuminate/support ^10.0|^11.0|^12.0
+
+## Architecture
+
+The SDK follows a static facade pattern. All API calls go through a single configured client.
+
+### Entry Point
+
+`GrippClient::configure($token, $baseUrl)` — must be called before any resource operations. Reads from GRIPP_API_TOKEN and GRIPP_API_URL env vars if arguments are omitted.
+
+### Transport Layer
+
+`JsonRpcClient` handles HTTP communication:
+- All calls use JSON-RPC protocol to `{baseUrl}/public/api3.php`
+- Methods follow the pattern `{entity}.{action}` (e.g. `company.get`, `project.create`)
+- Supports single calls, batch operations, and auto-pagination
+- Retries 5xx errors and connection failures up to 3 times
+
+### Resource Pattern
+
+54 resource classes in `src/Resources/`, each extending `Resource`:
+- `entity()` returns the JSON-RPC entity name (e.g. `'company'`, `'projectphase'`)
+- CRUD capabilities are composed via traits: `CanRead`, `CanCreate`, `CanUpdate`, `CanDelete`
+- Each resource has constants: `FIELDS` (name→type map), `READONLY`, `REQUIRED`, `RELATIONS` (FK→class map)
+
+### Query Builder
+
+`QueryBuilder` provides a fluent filter interface:
+- `where($field, $value)` — equality filter
+- `where($field, $operator, $value)` — operator filter
+- Operators: equals, notequals, contains, notcontains, startswith, endswith, greaterthan, lessthan, greaterthanorequal, lessthanorequal, in, notin, isnull, isnotnull
+- Chain with `orderBy()`, `limit()`, `offset()`
+- Terminate with `get()` (Collection), `first()` (?array), or `count()` (int)
+
+### Exceptions
+
+```
+GrippException (base)
+├── AuthenticationException (401/403)
+├── RateLimitException (429)
+└── RequestException (other API errors)
+```
+
+## Key Files
+
+- `src/GrippClient.php` — Configuration and transport access
+- `src/Transport/JsonRpcClient.php` — HTTP transport, batching, pagination
+- `src/Transport/JsonRpcResponse.php` — Response wrapper
+- `src/Resources/Resource.php` — Abstract base resource
+- `src/Resources/Concerns/CanRead.php` — get, find, all, where, first
+- `src/Resources/Concerns/CanCreate.php` — create
+- `src/Resources/Concerns/CanUpdate.php` — update
+- `src/Resources/Concerns/CanDelete.php` — delete
+- `src/Query/QueryBuilder.php` — Fluent filter/order/pagination builder
+- `src/Query/Filter.php` — Filter data structure
+
+## Usage Examples
+
+```php
+// Configure
+GrippClient::configure('token', 'https://tenant.gripp.com');
+
+// CRUD
+$company = Company::find(123);
+$companies = Company::all();
+$result = Company::create(['companyname' => 'Acme', 'relationtype' => 'COMPANY']);
+Company::update(123, ['phone' => '+31201234567']);
+Company::delete(123);
+
+// Query Builder
+$projects = Project::where('name', 'contains', 'Website')
+    ->where('archived', false)
+    ->orderBy('createdon', 'desc')
+    ->limit(25)
+    ->get();
+
+// Batch
+$transport = GrippClient::getTransport();
+$transport->startBatch();
+Company::find(1);
+Company::find(2);
+$responses = $transport->executeBatch();
+```
+
+## All Resources
+
+AbsenceRequest, AbsenceRequestLine, BulkPrice, CalendarItem, Company, CompanyDossier, Contact, Contract, ContractLine, Cost (read-only), CostHeading, Department, Employee, EmployeeFamily, EmployeeTarget (read-only), EmployeeYearlyLeaveBudget (no delete), EmploymentContract, ExternalLink, File (read-only), Hour, Invoice, InvoiceLine, Ledger, Memorial (read-only), MemorialLine (read-only), Notification (custom emit methods), Offer, OfferPhase, OfferProjectLine, Packet, PacketLine, Payment, PriceException, Product, Project, ProjectPhase, PurchaseInvoice, PurchaseInvoiceLine, PurchaseOrder, PurchaseOrderLine, PurchasePayment, RejectionReason, RevenueTarget (read-only), Tag, Task, TaskPhase, TaskType, TimelineEntry, UmbrellaProject (no delete), Unit, Webhook, YearTarget (read-only), YearTargetType (read-only)

@@ -1,0 +1,61 @@
+#!/usr/bin/env php
+<?php
+
+echo "Gripp SDK Setup\n";
+echo "================\n\n";
+
+$envFile = getcwd() . '/.env';
+
+// Read existing values if .env exists
+$existing = [];
+if (file_exists($envFile)) {
+    $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    foreach ($lines as $line) {
+        if (str_starts_with($line, '#')) {
+            continue;
+        }
+        if (str_contains($line, '=')) {
+            [$key, $value] = explode('=', $line, 2);
+            $existing[trim($key)] = trim($value);
+        }
+    }
+}
+
+$currentToken = $existing['GRIPP_API_TOKEN'] ?? '';
+$currentUrl = $existing['GRIPP_API_URL'] ?? '';
+
+// Prompt for API token
+echo "API Token" . ($currentToken ? " [{$currentToken}]" : "") . ": ";
+$token = trim(fgets(STDIN));
+if ($token === '' && $currentToken) {
+    $token = $currentToken;
+}
+
+if (empty($token)) {
+    echo "\nError: API token is required.\n";
+    exit(1);
+}
+
+// Prompt for API URL
+$defaultUrl = $currentUrl ?: 'https://api.gripp.com';
+echo "API URL [{$defaultUrl}]: ";
+$url = trim(fgets(STDIN));
+if ($url === '') {
+    $url = $defaultUrl;
+}
+
+// Update existing values
+$existing['GRIPP_API_TOKEN'] = $token;
+$existing['GRIPP_API_URL'] = $url;
+
+// Write .env file
+$content = '';
+foreach ($existing as $key => $value) {
+    $content .= "{$key}={$value}\n";
+}
+
+file_put_contents($envFile, $content);
+
+echo "\nConfiguration saved to {$envFile}\n";
+echo "  GRIPP_API_TOKEN={$token}\n";
+echo "  GRIPP_API_URL={$url}\n";
