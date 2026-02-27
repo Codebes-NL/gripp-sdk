@@ -1,4 +1,4 @@
-# Export ignore — these files are excluded from the Composer package
+# Export ignore - these files are excluded from the Composer package
 # (when installed via `composer require`, users won't get these)
 
 /.github            export-ignore

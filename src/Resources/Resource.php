@@ -12,13 +12,13 @@ use CodeBes\GrippSdk\Transport\JsonRpcResponse;
  * and provides static methods for CRUD operations via trait composition.
  *
  * Every resource exposes four constants describing its schema:
- * - FIELDS: array<string, string> — maps field names to types (string, int, float, boolean, datetime, date, array, customfields, color)
- * - READONLY: string[] — fields that cannot be written
- * - REQUIRED: string[] — fields that must be provided on create/update
- * - RELATIONS: array<string, class-string<Resource>> — maps FK fields to related resource classes
+ * - FIELDS: array<string, string>  - maps field names to types (string, int, float, boolean, datetime, date, array, customfields, color)
+ * - READONLY: string[]  - fields that cannot be written
+ * - REQUIRED: string[]  - fields that must be provided on create/update
+ * - RELATIONS: array<string, class-string<Resource>>  - maps FK fields to related resource classes
  *
  * @example
- * // All resources use static methods — no instantiation needed.
+ * // All resources use static methods  - no instantiation needed.
  *
  * // Read operations (via CanRead trait)
  * $record = Company::find(123);        // Single record by ID → ?array

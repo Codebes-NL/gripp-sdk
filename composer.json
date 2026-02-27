@@ -1,6 +1,6 @@
 {
     "name": "codebes/gripp-sdk",
-    "description": "PHP SDK for the Gripp CRM/ERP API — fluent query builder, batch operations, and 54 resources for project management, invoicing, time tracking, and more.",
+    "description": "PHP SDK for the Gripp CRM/ERP API. Fluent query builder, batch operations, and 54 resources for project management, invoicing, time tracking, and more.",
     "type": "library",
     "license": "MIT",
     "keywords": [

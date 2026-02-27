@@ -79,7 +79,7 @@ Company::delete(123);
 // -----------------------------------------------
 
 // Create a contact linked to a company
-// Check Contact::REQUIRED — 'company' (FK → Company) is required.
+// Check Contact::REQUIRED  - 'company' (FK → Company) is required.
 $contactResult = Contact::create([
     'company' => 42,
     'firstname' => 'Jan',
@@ -89,7 +89,7 @@ $contactResult = Contact::create([
 ]);
 
 // Create a project linked to a company
-// Check Project::REQUIRED — 'templateset', 'name', 'company' are required.
+// Check Project::REQUIRED  - 'templateset', 'name', 'company' are required.
 $projectResult = Project::create([
     'templateset' => 1,
     'name' => 'Website Redesign',

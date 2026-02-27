@@ -6,7 +6,7 @@ This is a PHP SDK (`codebes/gripp-sdk`) for the Gripp business management JSON-R
 
 ```
 src/
-├── GrippClient.php                  # Static facade — configure token/URL here first
+├── GrippClient.php                  # Static facade - configure token/URL here first
 ├── Transport/
 │   ├── JsonRpcClient.php            # HTTP transport (batch, pagination, retries)
 │   └── JsonRpcResponse.php          # Response wrapper (rows, count, toCollection)
@@ -14,7 +14,7 @@ src/
 │   ├── QueryBuilder.php             # Fluent filter builder (where/orderBy/limit/get)
 │   └── Filter.php                   # Filter value object (field, operator, value)
 ├── Resources/
-│   ├── Resource.php                 # Abstract base class — all 54 resources extend this
+│   ├── Resource.php                 # Abstract base class - all 54 resources extend this
 │   ├── Concerns/
 │   │   ├── CanRead.php              # get(), find(), all(), where(), first()
 │   │   ├── CanCreate.php            # create()
@@ -35,7 +35,7 @@ src/
 - **Traits compose CRUD capabilities.** Check which traits a resource `use`s to know what operations are available. Some resources are read-only (e.g. `Cost`, `File`, `Memorial`).
 - **Each resource has schema constants:** `FIELDS` (field→type), `READONLY`, `REQUIRED`, `RELATIONS` (FK→class).
 - **JSON-RPC methods follow the pattern:** `{entity}.{action}` (e.g. `company.get`, `project.create`).
-- **The `Notification` resource is special** — it uses `emit()` and `emitall()` instead of standard CRUD.
+- **The `Notification` resource is special** - it uses `emit()` and `emitall()` instead of standard CRUD.
 
 ## Filter Operators
 

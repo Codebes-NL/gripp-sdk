@@ -17,7 +17,7 @@ use CodeBes\GrippSdk\Resources\Project;
 GrippClient::configure();
 
 // -----------------------------------------------
-// 1. Basic batch — multiple reads in one request
+// 1. Basic batch  - multiple reads in one request
 // -----------------------------------------------
 
 $transport = GrippClient::getTransport();

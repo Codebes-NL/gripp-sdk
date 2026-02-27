@@ -15,7 +15,7 @@ The SDK follows a static facade pattern. All API calls go through a single confi
 
 ### Entry Point
 
-`GrippClient::configure($token, $baseUrl)` — must be called before any resource operations. Reads from GRIPP_API_TOKEN and GRIPP_API_URL env vars if arguments are omitted.
+`GrippClient::configure($token, $baseUrl)`  - must be called before any resource operations. Reads from GRIPP_API_TOKEN and GRIPP_API_URL env vars if arguments are omitted.
 
 ### Transport Layer
 
@@ -35,8 +35,8 @@ The SDK follows a static facade pattern. All API calls go through a single confi
 ### Query Builder
 
 `QueryBuilder` provides a fluent filter interface:
-- `where($field, $value)` — equality filter
-- `where($field, $operator, $value)` — operator filter
+- `where($field, $value)`  - equality filter
+- `where($field, $operator, $value)`  - operator filter
 - Operators: equals, notequals, contains, notcontains, startswith, endswith, greaterthan, lessthan, greaterthanorequal, lessthanorequal, in, notin, isnull, isnotnull
 - Chain with `orderBy()`, `limit()`, `offset()`
 - Terminate with `get()` (Collection), `first()` (?array), or `count()` (int)
@@ -52,16 +52,16 @@ GrippException (base)
 
 ## Key Files
 
-- `src/GrippClient.php` — Configuration and transport access
-- `src/Transport/JsonRpcClient.php` — HTTP transport, batching, pagination
-- `src/Transport/JsonRpcResponse.php` — Response wrapper
-- `src/Resources/Resource.php` — Abstract base resource
-- `src/Resources/Concerns/CanRead.php` — get, find, all, where, first
-- `src/Resources/Concerns/CanCreate.php` — create
-- `src/Resources/Concerns/CanUpdate.php` — update
-- `src/Resources/Concerns/CanDelete.php` — delete
-- `src/Query/QueryBuilder.php` — Fluent filter/order/pagination builder
-- `src/Query/Filter.php` — Filter data structure
+- `src/GrippClient.php`  - Configuration and transport access
+- `src/Transport/JsonRpcClient.php`  - HTTP transport, batching, pagination
+- `src/Transport/JsonRpcResponse.php`  - Response wrapper
+- `src/Resources/Resource.php`  - Abstract base resource
+- `src/Resources/Concerns/CanRead.php`  - get, find, all, where, first
+- `src/Resources/Concerns/CanCreate.php`  - create
+- `src/Resources/Concerns/CanUpdate.php`  - update
+- `src/Resources/Concerns/CanDelete.php`  - delete
+- `src/Query/QueryBuilder.php`  - Fluent filter/order/pagination builder
+- `src/Query/Filter.php`  - Filter data structure
 
 ## Usage Examples
 

@@ -56,7 +56,7 @@ try {
         echo "Error details: " . json_encode($data) . "\n";
     }
 } catch (GrippException $e) {
-    // Base exception — catches configuration errors too
+    // Base exception  - catches configuration errors too
     // e.g., "GrippClient is not configured"
     echo "SDK error: " . $e->getMessage() . "\n";
 }
@@ -83,7 +83,7 @@ try {
 
 try {
     Company::create(['companyname' => 'Test']);
-    // Missing required field 'relationtype' — API will return an error
+    // Missing required field 'relationtype'  - API will return an error
 } catch (GrippException $e) {
     // All SDK exceptions support toArray() for structured logging
     $errorData = $e->toArray();
