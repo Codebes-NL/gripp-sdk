@@ -1,6 +1,23 @@
 # Gripp SDK for PHP
 
-A PHP SDK for the [Gripp](https://www.gripp.com) API, providing a fluent interface to interact with all Gripp resources through JSON-RPC.
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/codebes/gripp-sdk.svg)](https://packagist.org/packages/codebes/gripp-sdk)
+[![Tests](https://github.com/Codebes-NL/gripp-sdk/actions/workflows/tests.yml/badge.svg)](https://github.com/Codebes-NL/gripp-sdk/actions/workflows/tests.yml)
+[![PHPStan](https://github.com/Codebes-NL/gripp-sdk/actions/workflows/static-analysis.yml/badge.svg)](https://github.com/Codebes-NL/gripp-sdk/actions/workflows/static-analysis.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![PHP Version](https://img.shields.io/packagist/php-v/codebes/gripp-sdk.svg)](https://packagist.org/packages/codebes/gripp-sdk)
+
+A PHP SDK for the [Gripp](https://www.gripp.com) CRM/ERP API. Manage companies, contacts, projects, invoices, time tracking, and 50+ other resources through a fluent query builder with batch operations, auto-pagination, and automatic retries. Works with any PHP 8.1+ application, including Laravel.
+
+## Features
+
+- Fluent query builder with 14 filter operators
+- Full CRUD support on 54 Gripp resources
+- Batch operations (multiple API calls in a single HTTP request)
+- Auto-pagination for large datasets
+- Automatic retries on server errors and connection failures
+- Typed exceptions for authentication, rate limiting, and API errors
+- Laravel Collection responses out of the box
+- Self-documenting resources with field types, required fields, and relationship metadata
 
 ## Requirements
 
@@ -311,6 +328,18 @@ Or directly:
 vendor/bin/phpunit
 ```
 
+## Changelog
+
+Please see the [GitHub Releases](https://github.com/Codebes-NL/gripp-sdk/releases) page for more information on what has changed recently.
+
+## Contributing
+
+Contributions are welcome! Please open a pull request against the `main` branch. All PRs require:
+- Passing tests (`composer test`)
+- Code style compliance (`composer cs`)
+- Static analysis passing (`composer analyse`)
+- Code owner approval
+
 ## License
 
-MIT
+MIT - see [LICENSE](LICENSE) for details.
