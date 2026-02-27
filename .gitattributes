@@ -1,0 +1,14 @@
+# Export ignore — these files are excluded from the Composer package
+# (when installed via `composer require`, users won't get these)
+
+/.github            export-ignore
+/.php-cs-fixer.dist.php export-ignore
+/.cursorrules       export-ignore
+/.gitattributes     export-ignore
+/.gitignore         export-ignore
+/CLAUDE.md          export-ignore
+/examples           export-ignore
+/llms.txt           export-ignore
+/phpstan.neon       export-ignore
+/phpunit.xml        export-ignore
+/tests              export-ignore
