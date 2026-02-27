@@ -76,9 +76,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Project extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'               => 'datetime',
         'updatedon'               => 'datetime',
         'id'                      => 'int',
@@ -118,7 +121,7 @@ class Project extends Resource
         'umbrellaproject'         => 'int',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -129,13 +132,13 @@ class Project extends Resource
         'totalexclvat',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'templateset',
         'name',
         'company',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'accountmanager'   => Employee::class,
         'phase'            => ProjectPhase::class,
         'company'          => Company::class,

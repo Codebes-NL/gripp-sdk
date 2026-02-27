@@ -46,9 +46,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class PurchaseOrder extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'                => 'datetime',
         'updatedon'                => 'datetime',
         'id'                       => 'int',
@@ -82,14 +85,14 @@ class PurchaseOrder extends Resource
         'purchaseorderlines'       => 'array',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'company'            => Company::class,
         'contact'            => Contact::class,
         'tags'               => Tag::class,

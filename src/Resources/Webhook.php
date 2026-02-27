@@ -20,9 +20,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Webhook extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -32,7 +35,7 @@ class Webhook extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',

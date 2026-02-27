@@ -20,7 +20,7 @@ class EmployeeTarget extends Resource
 {
     use CanRead;
 
-    const FIELDS = [
+    public const FIELDS = [
         'id'                => 'int',
         'employee'          => 'int',
         'year'              => 'int',
@@ -31,11 +31,11 @@ class EmployeeTarget extends Resource
         'targetbillability' => 'float',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'id',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'employee' => Employee::class,
     ];
 

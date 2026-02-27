@@ -39,9 +39,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Task extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -70,7 +73,7 @@ class Task extends Resource
         'calendaritems'      => 'array',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -79,11 +82,11 @@ class Task extends Resource
         'checklist',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'company',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'type'              => TaskType::class,
         'phase'             => TaskPhase::class,
         'company'           => Company::class,

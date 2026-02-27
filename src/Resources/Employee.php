@@ -54,9 +54,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Employee extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'            => 'datetime',
         'updatedon'            => 'datetime',
         'id'                   => 'int',
@@ -100,7 +103,7 @@ class Employee extends Resource
         'skills'               => 'array',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -108,13 +111,13 @@ class Employee extends Resource
         'active',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'username',
         'password',
         'role',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'userphoto'  => File::class,
         'department' => Department::class,
         'tags'       => Tag::class,

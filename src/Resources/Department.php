@@ -19,9 +19,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Department extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         '_ordering'          => 'int',
         'updatedon'          => 'datetime',
@@ -30,7 +33,7 @@ class Department extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',

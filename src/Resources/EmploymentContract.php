@@ -36,9 +36,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class EmploymentContract extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'            => 'datetime',
         'updatedon'            => 'datetime',
         'id'                   => 'int',
@@ -64,7 +67,7 @@ class EmploymentContract extends Resource
         'timeslots_even_weeks' => 'json',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -72,12 +75,12 @@ class EmploymentContract extends Resource
         'timeslots_even_weeks',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'startdate',
         'enddate',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'employee' => Employee::class,
     ];
 

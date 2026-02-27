@@ -41,9 +41,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Product extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'id'                       => 'int',
         'createdon'                => 'datetime',
         'updatedon'                => 'datetime',
@@ -74,7 +77,7 @@ class Product extends Resource
         'attachments_external'     => 'array',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'id',
         'createdon',
         'updatedon',
@@ -82,14 +85,14 @@ class Product extends Resource
         'number',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'name',
         'unit',
         'vat',
         'invoicebasis',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'unit'                 => Unit::class,
         'tasktype'             => TaskType::class,
         'costheading'          => CostHeading::class,

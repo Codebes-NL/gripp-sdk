@@ -110,9 +110,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Company extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'                     => 'datetime',
         'updatedon'                     => 'datetime',
         'id'                            => 'int',
@@ -184,7 +187,7 @@ class Company extends Resource
         'files'                         => 'array',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -192,11 +195,11 @@ class Company extends Resource
         'files',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'relationtype',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'accountmanager' => Employee::class,
         'tags'           => Tag::class,
         'files'          => File::class,

@@ -48,9 +48,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Contract extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'              => 'datetime',
         'updatedon'              => 'datetime',
         'id'                     => 'int',
@@ -88,7 +91,7 @@ class Contract extends Resource
         'contractlines'          => 'array',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -99,7 +102,7 @@ class Contract extends Resource
         'isbasis',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'templateset',
         'name',
         'date',
@@ -108,7 +111,7 @@ class Contract extends Resource
         'paymentmethod',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'company'           => Company::class,
         'contact'           => Contact::class,
         'tags'              => Tag::class,

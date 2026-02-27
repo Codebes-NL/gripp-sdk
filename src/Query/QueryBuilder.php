@@ -51,7 +51,7 @@ class QueryBuilder
     /**
      * All supported filter operators.
      */
-    const OPERATORS = [
+    public const OPERATORS = [
         'equals',
         'notequals',
         'contains',

@@ -37,9 +37,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class ContractLine extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         '_ordering'          => 'int',
@@ -66,14 +69,14 @@ class ContractLine extends Resource
         'hidedetails'        => 'boolean',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'contract',
         'product',
         'convertto',
@@ -85,7 +88,7 @@ class ContractLine extends Resource
         'invoicebasis',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'contract' => Contract::class,
         'product'  => Product::class,
         'unit'     => Unit::class,

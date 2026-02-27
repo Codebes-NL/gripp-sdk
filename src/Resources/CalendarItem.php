@@ -27,9 +27,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class CalendarItem extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'            => 'datetime',
         'updatedon'            => 'datetime',
         '_ordering'            => 'int',
@@ -46,20 +49,20 @@ class CalendarItem extends Resource
         'extendedproperties'   => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'date',
         'hours',
         'task',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'calendaritememployee' => Employee::class,
         'timelineentry'        => TimelineEntry::class,
         'task'                 => Task::class,

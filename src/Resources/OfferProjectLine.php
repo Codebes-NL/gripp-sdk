@@ -38,9 +38,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class OfferProjectLine extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         '_ordering'          => 'int',
@@ -68,7 +71,7 @@ class OfferProjectLine extends Resource
         'product'            => 'int',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -76,7 +79,7 @@ class OfferProjectLine extends Resource
         'amountwritten',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'amount',
         'sellingprice',
         'discount',
@@ -87,7 +90,7 @@ class OfferProjectLine extends Resource
         'product',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'unit'         => Unit::class,
         'contractline' => ContractLine::class,
         'product'      => Product::class,

@@ -26,7 +26,7 @@ class Memorial extends Resource
 {
     use CanRead;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -43,7 +43,7 @@ class Memorial extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -60,7 +60,7 @@ class Memorial extends Resource
         'extendedproperties',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'files'         => File::class,
         'tags'          => Tag::class,
         'memoriallines' => MemorialLine::class,

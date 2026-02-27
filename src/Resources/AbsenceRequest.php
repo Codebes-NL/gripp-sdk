@@ -23,9 +23,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class AbsenceRequest extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -38,14 +41,14 @@ class AbsenceRequest extends Resource
         'absencerequestline' => 'array',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'employee'           => Employee::class,
         'absencerequestline' => AbsenceRequestLine::class,
     ];

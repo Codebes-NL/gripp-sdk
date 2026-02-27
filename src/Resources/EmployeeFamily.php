@@ -22,9 +22,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class EmployeeFamily extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -36,18 +39,18 @@ class EmployeeFamily extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'employee',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'employee' => Employee::class,
     ];
 

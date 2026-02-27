@@ -20,9 +20,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class PriceException extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -32,13 +35,13 @@ class PriceException extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'company' => Company::class,
         'product' => Product::class,
     ];

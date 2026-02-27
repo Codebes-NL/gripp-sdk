@@ -3,7 +3,6 @@
 namespace CodeBes\GrippSdk;
 
 use CodeBes\GrippSdk\Exceptions\GrippException;
-use CodeBes\GrippSdk\Resources;
 use CodeBes\GrippSdk\Transport\JsonRpcClient;
 
 /**
@@ -31,7 +30,7 @@ class GrippClient
      *
      * @var array<string, class-string<Resources\Resource>>
      */
-    const RESOURCES = [
+    public const RESOURCES = [
         'absencerequest'             => Resources\AbsenceRequest::class,
         'absencerequestline'         => Resources\AbsenceRequestLine::class,
         'bulkprice'                  => Resources\BulkPrice::class,

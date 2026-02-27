@@ -14,12 +14,12 @@ class YearTargetType extends Resource
 {
     use CanRead;
 
-    const FIELDS = [
+    public const FIELDS = [
         'id'   => 'int',
         'name' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'id',
         'name',
     ];

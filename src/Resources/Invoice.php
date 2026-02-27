@@ -51,9 +51,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Invoice extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'                      => 'datetime',
         'updatedon'                      => 'datetime',
         'id'                             => 'int',
@@ -94,7 +97,7 @@ class Invoice extends Resource
         'directpdfurl'                   => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -112,7 +115,7 @@ class Invoice extends Resource
         'directpdfurl',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'templateset',
         'status',
         'paymentmethod',
@@ -120,7 +123,7 @@ class Invoice extends Resource
         'client',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'company'      => Company::class,
         'contact'      => Contact::class,
         'tags'         => Tag::class,

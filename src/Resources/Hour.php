@@ -31,9 +31,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Hour extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -54,19 +57,19 @@ class Hour extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'employee',
         'offerprojectbase',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'task'             => Task::class,
         'employee'         => Employee::class,
         'authorizedby'     => Employee::class,

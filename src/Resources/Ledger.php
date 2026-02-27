@@ -23,9 +23,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Ledger extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'   => 'datetime',
         'updatedon'   => 'datetime',
         'id'          => 'int',
@@ -38,7 +41,7 @@ class Ledger extends Resource
         'active'      => 'boolean',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',

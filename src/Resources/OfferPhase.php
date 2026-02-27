@@ -21,9 +21,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class OfferPhase extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         '_ordering'          => 'int',
         'updatedon'          => 'datetime',
@@ -34,7 +37,7 @@ class OfferPhase extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',

@@ -29,9 +29,11 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class UmbrellaProject extends Resource
 {
-    use CanCreate, CanRead, CanUpdate;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -51,14 +53,14 @@ class UmbrellaProject extends Resource
         'budget'             => 'float',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'phase' => ProjectPhase::class,
         'tags'  => Tag::class,
     ];

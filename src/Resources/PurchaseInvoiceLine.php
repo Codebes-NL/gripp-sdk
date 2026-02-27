@@ -31,9 +31,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class PurchaseInvoiceLine extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         '_ordering'          => 'int',
@@ -54,14 +57,14 @@ class PurchaseInvoiceLine extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'purchaseinvoice',
         'amount',
         'sellingprice',
@@ -69,7 +72,7 @@ class PurchaseInvoiceLine extends Resource
         'vat',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'purchaseinvoice'   => PurchaseInvoice::class,
         'costheading'       => CostHeading::class,
         'ledger'            => Ledger::class,

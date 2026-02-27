@@ -16,15 +16,18 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class RejectionReason extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'id'       => 'int',
         'zoeknaam' => 'string',
         'naam'     => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'id',
         'zoeknaam',
     ];

@@ -19,9 +19,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class ExternalLink extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'record_id' => 'int',
         'page'      => 'string',
         'label'     => 'string',

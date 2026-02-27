@@ -23,7 +23,7 @@ class Cost extends Resource
 {
     use CanRead;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -37,7 +37,7 @@ class Cost extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -51,7 +51,7 @@ class Cost extends Resource
         'extendedproperties',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'ledger'      => Ledger::class,
         'costheading' => CostHeading::class,
     ];

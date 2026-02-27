@@ -37,9 +37,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class TimelineEntry extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -66,7 +69,7 @@ class TimelineEntry extends Resource
         'calendaritem'       => 'int',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
@@ -75,11 +78,11 @@ class TimelineEntry extends Resource
         'timelinetype',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'company',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'employee'        => Employee::class,
         'company'         => Company::class,
         'contact'         => Contact::class,

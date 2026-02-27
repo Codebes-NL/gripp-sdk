@@ -28,7 +28,7 @@ class YearTarget extends Resource
 {
     use CanRead;
 
-    const FIELDS = [
+    public const FIELDS = [
         'id'             => 'int',
         'year'           => 'int',
         'month1'         => 'float',
@@ -47,7 +47,7 @@ class YearTarget extends Resource
         'yeartargettype' => 'int',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'id',
         'year',
         'month1',
@@ -66,7 +66,7 @@ class YearTarget extends Resource
         'yeartargettype',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'yeartargettype' => YearTargetType::class,
     ];
 

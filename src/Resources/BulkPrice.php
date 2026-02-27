@@ -22,9 +22,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class BulkPrice extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -36,13 +39,13 @@ class BulkPrice extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'product' => Product::class,
     ];
 

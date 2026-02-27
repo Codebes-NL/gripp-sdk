@@ -39,9 +39,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class InvoiceLine extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         'id'                 => 'int',
@@ -70,14 +73,14 @@ class InvoiceLine extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'invoice',
         'product',
         'amount',
@@ -87,7 +90,7 @@ class InvoiceLine extends Resource
         'vat',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'invoice'         => Invoice::class,
         'product'         => Product::class,
         'unit'            => Unit::class,

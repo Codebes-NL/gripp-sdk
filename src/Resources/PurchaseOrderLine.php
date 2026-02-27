@@ -32,9 +32,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class PurchaseOrderLine extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
         '_ordering'          => 'int',
@@ -56,19 +59,19 @@ class PurchaseOrderLine extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
         'searchname',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'vat',
         'purchaseorder',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'costheading'   => CostHeading::class,
         'ledger'        => Ledger::class,
         'purchaseorder' => PurchaseOrder::class,

@@ -23,9 +23,11 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class EmployeeYearlyLeaveBudget extends Resource
 {
-    use CanCreate, CanRead, CanUpdate;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
 
-    const FIELDS = [
+    public const FIELDS = [
         'id'                 => 'int',
         'createdon'          => 'datetime',
         'updatedon'          => 'datetime',
@@ -39,18 +41,18 @@ class EmployeeYearlyLeaveBudget extends Resource
         'extendedproperties' => 'string',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'id',
         'createdon',
         'updatedon',
         'balance',
     ];
 
-    const REQUIRED = [
+    public const REQUIRED = [
         'employee',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'employee' => Employee::class,
     ];
 

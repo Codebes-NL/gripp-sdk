@@ -28,9 +28,12 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  */
 class Packet extends Resource
 {
-    use CanCreate, CanRead, CanUpdate, CanDelete;
+    use CanCreate;
+    use CanRead;
+    use CanUpdate;
+    use CanDelete;
 
-    const FIELDS = [
+    public const FIELDS = [
         'createdon'                => 'datetime',
         'updatedon'                => 'datetime',
         'id'                       => 'int',
@@ -48,13 +51,13 @@ class Packet extends Resource
         'archived'                 => 'boolean',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'createdon',
         'updatedon',
         'id',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'unit'        => Unit::class,
         'tags'        => Tag::class,
         'packetlines' => PacketLine::class,

@@ -17,7 +17,7 @@ class RevenueTarget extends Resource
 {
     use CanRead;
 
-    const FIELDS = [
+    public const FIELDS = [
         'id'                => 'int',
         'company'           => 'int',
         'year'              => 'int',
@@ -25,7 +25,7 @@ class RevenueTarget extends Resource
         'targetgrossprofit' => 'float',
     ];
 
-    const READONLY = [
+    public const READONLY = [
         'id',
         'company',
         'year',
@@ -33,7 +33,7 @@ class RevenueTarget extends Resource
         'targetgrossprofit',
     ];
 
-    const RELATIONS = [
+    public const RELATIONS = [
         'company' => Company::class,
     ];
 
