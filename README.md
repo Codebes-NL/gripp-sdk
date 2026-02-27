@@ -6,7 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![PHP Version](https://img.shields.io/packagist/php-v/codebes/gripp-sdk.svg)](https://packagist.org/packages/codebes/gripp-sdk)
 
-A PHP SDK for the [Gripp](https://www.gripp.com) CRM/ERP API. Manage companies, contacts, projects, invoices, time tracking, and 50+ other resources through a fluent query builder with batch operations, auto-pagination, and automatic retries. Works with any PHP 8.1+ application, including Laravel.
+A PHP SDK for the [Gripp](https://www.gripp.com) (now [Exact Gripp](https://www.exact.com/nl/producten/exact-gripp)) CRM/ERP API. Manage companies, contacts, projects, invoices, time tracking, and 50+ other resources through a fluent query builder with batch operations, auto-pagination, and automatic retries. Works with any PHP 8.1+ application, including Laravel.
 
 ## Features
 
