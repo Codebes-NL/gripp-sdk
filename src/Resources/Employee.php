@@ -2,6 +2,7 @@
 
 namespace CodeBes\GrippSdk\Resources;
 
+use CodeBes\GrippSdk\Features\Billability;
 use CodeBes\GrippSdk\Resources\Concerns\CanCreate;
 use CodeBes\GrippSdk\Resources\Concerns\CanDelete;
 use CodeBes\GrippSdk\Resources\Concerns\CanRead;
@@ -141,5 +142,25 @@ class Employee extends Resource
     public static function getWorkingHours(array $employeeIds, string $startDate, string $stopDate, bool $includeAbsence = false): array
     {
         return static::rpcCall('getWorkingHours', [$employeeIds, $startDate, $stopDate, $includeAbsence])->result();
+    }
+
+    /**
+     * Get billability (declarabiliteit) for an employee within a date range.
+     *
+     * @return array{employee_id: int, from: string, to: string, total_hours: float, billable_hours: float, non_billable_hours: float, billability_percentage: float, uninvoiced_hours: float, by_project: array}
+     */
+    public static function getBillability(int $employeeId, string $from, string $to): array
+    {
+        return Billability::forEmployee($employeeId, $from, $to);
+    }
+
+    /**
+     * Get invoiceability (facturabiliteit) for an employee within a date range.
+     *
+     * @return array{employee_id: int, from: string, to: string, total_hours: float, billable_hours: float, invoiced_hours: float, uninvoiced_hours: float, invoiceability_percentage: float, by_project: array}
+     */
+    public static function getInvoiceability(int $employeeId, string $from, string $to): array
+    {
+        return Billability::invoiceabilityForEmployee($employeeId, $from, $to);
     }
 }

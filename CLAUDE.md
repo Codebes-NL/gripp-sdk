@@ -13,6 +13,8 @@ src/
 ├── Query/
 │   ├── QueryBuilder.php             # Fluent filter builder (where/orderBy/limit/get)
 │   └── Filter.php                   # Filter value object (field, operator, value)
+├── Features/
+│   └── Billability.php              # Billability calculations (employee, team, project)
 ├── Resources/
 │   ├── Resource.php                 # Abstract base class - all 54 resources extend this
 │   ├── Concerns/
@@ -36,6 +38,7 @@ src/
 - **Each resource has schema constants:** `FIELDS` (field→type), `READONLY`, `REQUIRED`, `RELATIONS` (FK→class).
 - **JSON-RPC methods follow the pattern:** `{entity}.{action}` (e.g. `company.get`, `project.create`).
 - **The `Notification` resource is special** - it uses `emit()` and `emitall()` instead of standard CRUD.
+- **Features are computed logic, not API resources.** `Billability` aggregates Hour and OfferProjectLine data to calculate billable/non-billable time. Usage: `Billability::forEmployee(42, '2026-01-01', '2026-01-31')`.
 
 ## Filter Operators
 
