@@ -66,12 +66,12 @@ class Billability
      */
     public static function forEmployee(int $employeeId, string $from, string $to): array
     {
-        $hours = static::paginatedQuery('hour', [
+        $hours = self::paginatedQuery('hour', [
             ['field' => 'hour.employee', 'operator' => 'equals', 'value' => $employeeId],
             ['field' => 'hour.date', 'operator' => 'between', 'value' => $from, 'value2' => $to],
         ]);
 
-        $lineLookup = static::resolveLineInvoiceBasis($hours);
+        $lineLookup = self::resolveLineInvoiceBasis($hours);
 
         $totalHours = 0.0;
         $billableHours = 0.0;
@@ -83,7 +83,7 @@ class Billability
             $amount = (float) ($hour['amount'] ?? 0);
             $totalHours += $amount;
 
-            $lineId = static::resolveId($hour['offerprojectline'] ?? null);
+            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
             $invoiceBasisId = $lineId ? ($lineLookup[$lineId] ?? null) : null;
             $isBillable = $invoiceBasisId !== null && $invoiceBasisId !== self::INVOICEBASIS_NONBILLABLE;
 
@@ -93,13 +93,13 @@ class Billability
                 $nonBillableHours += $amount;
             }
 
-            $statusId = static::resolveId($hour['status'] ?? null);
+            $statusId = self::resolveId($hour['status'] ?? null);
             $invoiceLine = $hour['invoiceline'] ?? null;
             if (in_array($statusId, [self::STATUS_DEFINITIVE, self::STATUS_AUTHORIZED]) && $invoiceLine === null) {
                 $uninvoicedHours += $amount;
             }
 
-            $projectId = static::resolveId($hour['offerprojectbase'] ?? null);
+            $projectId = self::resolveId($hour['offerprojectbase'] ?? null);
             if ($projectId !== null) {
                 if (! isset($byProject[$projectId])) {
                     $byProject[$projectId] = [
@@ -148,8 +148,8 @@ class Billability
             $filters[] = ['field' => 'hour.employee', 'operator' => 'in', 'value' => $employeeIds];
         }
 
-        $hours = static::paginatedQuery('hour', $filters);
-        $lineLookup = static::resolveLineInvoiceBasis($hours);
+        $hours = self::paginatedQuery('hour', $filters);
+        $lineLookup = self::resolveLineInvoiceBasis($hours);
 
         $totalHours = 0.0;
         $billableHours = 0.0;
@@ -160,7 +160,7 @@ class Billability
             $amount = (float) ($hour['amount'] ?? 0);
             $totalHours += $amount;
 
-            $lineId = static::resolveId($hour['offerprojectline'] ?? null);
+            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
             $invoiceBasisId = $lineId ? ($lineLookup[$lineId] ?? null) : null;
             $isBillable = $invoiceBasisId !== null && $invoiceBasisId !== self::INVOICEBASIS_NONBILLABLE;
 
@@ -170,7 +170,7 @@ class Billability
                 $nonBillableHours += $amount;
             }
 
-            $empId = static::resolveId($hour['employee'] ?? null);
+            $empId = self::resolveId($hour['employee'] ?? null);
             if ($empId !== null) {
                 if (! isset($byEmployee[$empId])) {
                     $byEmployee[$empId] = [
@@ -214,7 +214,7 @@ class Billability
      */
     public static function forProject(int $projectId): array
     {
-        $lines = static::paginatedQuery('offerprojectline', [
+        $lines = self::paginatedQuery('offerprojectline', [
             ['field' => 'offerprojectline.offerprojectbase', 'operator' => 'equals', 'value' => $projectId],
         ]);
 
@@ -230,7 +230,7 @@ class Billability
             $totalBudgeted += $budgeted;
             $totalActual += $actual;
 
-            $basisId = static::resolveInvoiceBasisId($line['invoicebasis'] ?? null);
+            $basisId = self::resolveInvoiceBasisId($line['invoicebasis'] ?? null);
 
             $lineResults[] = [
                 'offerprojectline_id' => $line['id'],
@@ -271,13 +271,13 @@ class Billability
      */
     public static function invoiceabilityForEmployee(int $employeeId, string $from, string $to): array
     {
-        $hours = static::paginatedQuery('hour', [
+        $hours = self::paginatedQuery('hour', [
             ['field' => 'hour.employee', 'operator' => 'equals', 'value' => $employeeId],
             ['field' => 'hour.date', 'operator' => 'between', 'value' => $from, 'value2' => $to],
         ]);
 
-        $lineLookup = static::resolveLineInvoiceBasis($hours);
-        $invoicedLines = static::resolveInvoicedLines($hours, $from, $to);
+        $lineLookup = self::resolveLineInvoiceBasis($hours);
+        $invoicedLines = self::resolveInvoicedLines($hours, $from, $to);
 
         $totalHours = 0.0;
         $billableHours = 0.0;
@@ -289,7 +289,7 @@ class Billability
             $amount = (float) ($hour['amount'] ?? 0);
             $totalHours += $amount;
 
-            $lineId = static::resolveId($hour['offerprojectline'] ?? null);
+            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
             $invoiceBasisId = $lineId ? ($lineLookup[$lineId] ?? null) : null;
             $isBillable = $invoiceBasisId !== null && $invoiceBasisId !== self::INVOICEBASIS_NONBILLABLE;
 
@@ -298,7 +298,7 @@ class Billability
             }
 
             $billableHours += $amount;
-            $isInvoiced = static::isHourInvoiced($hour, $lineId, $invoiceBasisId, $invoicedLines);
+            $isInvoiced = self::isHourInvoiced($hour, $lineId, $invoiceBasisId, $invoicedLines);
 
             if ($isInvoiced) {
                 $invoicedHours += $amount;
@@ -306,7 +306,7 @@ class Billability
                 $uninvoicedHours += $amount;
             }
 
-            $projectId = static::resolveId($hour['offerprojectbase'] ?? null);
+            $projectId = self::resolveId($hour['offerprojectbase'] ?? null);
             if ($projectId !== null) {
                 if (! isset($byProject[$projectId])) {
                     $byProject[$projectId] = [
@@ -361,9 +361,9 @@ class Billability
             $filters[] = ['field' => 'hour.employee', 'operator' => 'in', 'value' => $employeeIds];
         }
 
-        $hours = static::paginatedQuery('hour', $filters);
-        $lineLookup = static::resolveLineInvoiceBasis($hours);
-        $invoicedLines = static::resolveInvoicedLines($hours, $from, $to);
+        $hours = self::paginatedQuery('hour', $filters);
+        $lineLookup = self::resolveLineInvoiceBasis($hours);
+        $invoicedLines = self::resolveInvoicedLines($hours, $from, $to);
 
         $totalHours = 0.0;
         $billableHours = 0.0;
@@ -375,7 +375,7 @@ class Billability
             $amount = (float) ($hour['amount'] ?? 0);
             $totalHours += $amount;
 
-            $empId = static::resolveId($hour['employee'] ?? null);
+            $empId = self::resolveId($hour['employee'] ?? null);
             if ($empId !== null && ! isset($byEmployee[$empId])) {
                 $byEmployee[$empId] = [
                     'employee_id' => $empId,
@@ -390,7 +390,7 @@ class Billability
                 $byEmployee[$empId]['total_hours'] += $amount;
             }
 
-            $lineId = static::resolveId($hour['offerprojectline'] ?? null);
+            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
             $invoiceBasisId = $lineId ? ($lineLookup[$lineId] ?? null) : null;
             $isBillable = $invoiceBasisId !== null && $invoiceBasisId !== self::INVOICEBASIS_NONBILLABLE;
 
@@ -399,7 +399,7 @@ class Billability
             }
 
             $billableHours += $amount;
-            $isInvoiced = static::isHourInvoiced($hour, $lineId, $invoiceBasisId, $invoicedLines);
+            $isInvoiced = self::isHourInvoiced($hour, $lineId, $invoiceBasisId, $invoicedLines);
 
             if ($isInvoiced) {
                 $invoicedHours += $amount;
@@ -457,7 +457,7 @@ class Billability
             $filters[] = ['field' => 'hour.employee', 'operator' => 'equals', 'value' => $employeeId];
         }
 
-        $hours = static::paginatedQuery('hour', $filters);
+        $hours = self::paginatedQuery('hour', $filters);
 
         $totalHours = 0.0;
         $hourResults = [];
@@ -468,10 +468,10 @@ class Billability
 
             $hourResults[] = [
                 'id' => $hour['id'],
-                'date' => static::resolveDate($hour['date'] ?? null),
+                'date' => self::resolveDate($hour['date'] ?? null),
                 'amount' => $amount,
-                'employee' => static::resolveId($hour['employee'] ?? null),
-                'offerprojectbase' => static::resolveId($hour['offerprojectbase'] ?? null),
+                'employee' => self::resolveId($hour['employee'] ?? null),
+                'offerprojectbase' => self::resolveId($hour['offerprojectbase'] ?? null),
                 'description' => $hour['description'] ?? '',
             ];
         }
@@ -506,7 +506,7 @@ class Billability
     private static function resolveLineInvoiceBasis(Collection $hours): array
     {
         $lineIds = $hours
-            ->map(fn ($h) => static::resolveId($h['offerprojectline'] ?? null))
+            ->map(fn ($h) => self::resolveId($h['offerprojectline'] ?? null))
             ->filter()
             ->unique()
             ->values()
@@ -516,13 +516,13 @@ class Billability
             return [];
         }
 
-        $lines = static::paginatedQuery('offerprojectline', [
+        $lines = self::paginatedQuery('offerprojectline', [
             ['field' => 'offerprojectline.id', 'operator' => 'in', 'value' => $lineIds],
         ]);
 
         $lookup = [];
         foreach ($lines as $line) {
-            $lookup[$line['id']] = static::resolveInvoiceBasisId($line['invoicebasis'] ?? null);
+            $lookup[$line['id']] = self::resolveInvoiceBasisId($line['invoicebasis'] ?? null);
         }
 
         return $lookup;
@@ -558,7 +558,7 @@ class Billability
     private static function resolveInvoicedLines(Collection $hours, string $from, string $to): array
     {
         $lineIds = $hours
-            ->map(fn ($h) => static::resolveId($h['offerprojectline'] ?? null))
+            ->map(fn ($h) => self::resolveId($h['offerprojectline'] ?? null))
             ->filter()
             ->unique()
             ->values()
@@ -568,13 +568,13 @@ class Billability
             return [];
         }
 
-        $invoiceLines = static::paginatedQuery('invoiceline', [
+        $invoiceLines = self::paginatedQuery('invoiceline', [
             ['field' => 'invoiceline.part', 'operator' => 'in', 'value' => $lineIds],
         ]);
 
         $invoiced = [];
         foreach ($invoiceLines as $il) {
-            $partId = static::resolveId($il['part'] ?? null);
+            $partId = self::resolveId($il['part'] ?? null);
             if ($partId !== null) {
                 $invoiced[$partId] = true;
             }
