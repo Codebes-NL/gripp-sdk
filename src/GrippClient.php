@@ -11,10 +11,10 @@ use CodeBes\GrippSdk\Transport\JsonRpcClient;
  * Call configure() once at application boot before using any resource.
  *
  * @example
- * // Configure from explicit credentials
- * GrippClient::configure('your-token', 'https://your-tenant.gripp.com');
+ * // Configure with just a token (uses https://api.gripp.com by default)
+ * GrippClient::configure('your-token');
  *
- * // Or configure from environment variables (GRIPP_API_TOKEN, GRIPP_API_URL)
+ * // Or configure from environment variables (GRIPP_API_TOKEN, optionally GRIPP_API_URL)
  * GrippClient::configure();
  *
  * // Then use any resource
@@ -92,10 +92,12 @@ class GrippClient
 
     protected static ?JsonRpcClient $transport = null;
 
+    protected static string $defaultBaseUrl = 'https://api.gripp.com';
+
     public static function configure(?string $token = null, ?string $baseUrl = null): void
     {
         static::$token = $token ?? getenv('GRIPP_API_TOKEN') ?: ($_ENV['GRIPP_API_TOKEN'] ?? null);
-        static::$baseUrl = $baseUrl ?? getenv('GRIPP_API_URL') ?: ($_ENV['GRIPP_API_URL'] ?? null);
+        static::$baseUrl = $baseUrl ?? getenv('GRIPP_API_URL') ?: ($_ENV['GRIPP_API_URL'] ?? static::$defaultBaseUrl);
 
         // Reset transport so it gets recreated with new config
         static::$transport = null;
@@ -104,9 +106,9 @@ class GrippClient
     public static function getTransport(): JsonRpcClient
     {
         if (static::$transport === null) {
-            if (empty(static::$token) || empty(static::$baseUrl)) {
+            if (empty(static::$token)) {
                 throw new GrippException(
-                    'GrippClient is not configured. Call GrippClient::configure($token, $url) first.'
+                    'GrippClient is not configured. Call GrippClient::configure($token) first.'
                 );
             }
 

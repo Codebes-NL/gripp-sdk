@@ -32,7 +32,7 @@ src/
 
 ## Key Patterns
 
-- **Always call `GrippClient::configure()` before using any resource.** It reads from `GRIPP_API_TOKEN` and `GRIPP_API_URL` env vars if no arguments are given.
+- **Always call `GrippClient::configure()` before using any resource.** It reads from `GRIPP_API_TOKEN` env var if no arguments are given. Uses `https://api.gripp.com` by default; override with `GRIPP_API_URL` env var or `baseUrl` parameter.
 - **Resources are static classes.** Usage: `Company::find(123)`, `Company::create([...])`, `Project::where('name', 'contains', 'foo')->get()`.
 - **Traits compose CRUD capabilities.** Check which traits a resource `use`s to know what operations are available. Some resources are read-only (e.g. `Cost`, `File`, `Memorial`).
 - **Each resource has schema constants:** `FIELDS` (field→type), `READONLY`, `REQUIRED`, `RELATIONS` (FK→class).

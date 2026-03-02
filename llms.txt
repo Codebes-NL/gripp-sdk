@@ -15,12 +15,12 @@ The SDK follows a static facade pattern. All API calls go through a single confi
 
 ### Entry Point
 
-`GrippClient::configure($token, $baseUrl)`  - must be called before any resource operations. Reads from GRIPP_API_TOKEN and GRIPP_API_URL env vars if arguments are omitted.
+`GrippClient::configure($token)`  - must be called before any resource operations. Reads from GRIPP_API_TOKEN env var if omitted. Uses `https://api.gripp.com` by default; override with GRIPP_API_URL env var or `baseUrl` parameter.
 
 ### Transport Layer
 
 `JsonRpcClient` handles HTTP communication:
-- All calls use JSON-RPC protocol to `{baseUrl}/public/api3.php`
+- All calls use JSON-RPC protocol to `https://api.gripp.com/public/api3.php` (base URL is configurable)
 - Methods follow the pattern `{entity}.{action}` (e.g. `company.get`, `project.create`)
 - Supports single calls, batch operations, and auto-pagination
 - Retries 5xx errors and connection failures up to 3 times
@@ -77,7 +77,7 @@ GrippException (base)
 
 ```php
 // Configure
-GrippClient::configure('token', 'https://tenant.gripp.com');
+GrippClient::configure('token');
 
 // CRUD
 $company = Company::find(123);

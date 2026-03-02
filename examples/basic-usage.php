@@ -17,13 +17,10 @@ use CodeBes\GrippSdk\Resources\Project;
 // 1. Configure the client (required before any API call)
 // -----------------------------------------------
 
-// Option A: Pass credentials directly
-GrippClient::configure(
-    token: 'your-api-token',
-    baseUrl: 'https://your-tenant.gripp.com'
-);
+// Option A: Pass token directly (uses https://api.gripp.com by default)
+GrippClient::configure(token: 'your-api-token');
 
-// Option B: Read from environment variables (GRIPP_API_TOKEN, GRIPP_API_URL)
+// Option B: Read from environment variable (GRIPP_API_TOKEN)
 // GrippClient::configure();
 
 // -----------------------------------------------
