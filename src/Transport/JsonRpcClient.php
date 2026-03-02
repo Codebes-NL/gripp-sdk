@@ -25,6 +25,16 @@ class JsonRpcClient
 
     protected bool $batching = false;
 
+    protected ?int $rateLimitRemaining = null;
+
+    protected ?int $rateLimitLimit = null;
+
+    /** @var callable|null */
+    protected $beforeRequestCallback = null;
+
+    /** @var callable|null */
+    protected $onRateLimitCallback = null;
+
     protected const API_PATH = '/public/api3.php';
 
     protected const API_CONNECTOR_VERSION = 3011;
@@ -138,6 +148,51 @@ class JsonRpcClient
         return $this->requestCount;
     }
 
+    /**
+     * Register a callback that runs before each HTTP request.
+     *
+     * Receives (requestCount, rateLimitRemaining, rateLimitLimit).
+     * Throw any exception to abort the request.
+     *
+     * @param  callable(int $requestCount, ?int $remaining, ?int $limit): void $callback
+     */
+    public function beforeRequest(callable $callback): void
+    {
+        $this->beforeRequestCallback = $callback;
+    }
+
+    /**
+     * Register a callback that fires when a rate limit is hit (429 or 503/1004).
+     *
+     * Runs before the SDK throws RateLimitException.
+     * If the callback throws, that exception propagates instead.
+     * The $statusCode parameter distinguishes hourly limits (429) from burst throttles (503).
+     *
+     * @param  callable(?int $retryAfter, ?int $remaining, int $statusCode): void $callback
+     */
+    public function onRateLimitExceeded(callable $callback): void
+    {
+        $this->onRateLimitCallback = $callback;
+    }
+
+    /**
+     * Get the remaining API calls for the current rate limit window,
+     * as reported by the most recent response header.
+     */
+    public function getRateLimitRemaining(): ?int
+    {
+        return $this->rateLimitRemaining;
+    }
+
+    /**
+     * Get the total API call limit for the current rate limit window,
+     * as reported by the most recent response header.
+     */
+    public function getRateLimitLimit(): ?int
+    {
+        return $this->rateLimitLimit;
+    }
+
     protected function buildPayload(string $method, array $params): array
     {
         return [
@@ -150,6 +205,14 @@ class JsonRpcClient
 
     protected function sendRequest(array $payload, int $attempt = 1): array
     {
+        if ($attempt === 1 && $this->beforeRequestCallback) {
+            ($this->beforeRequestCallback)(
+                $this->requestCount,
+                $this->rateLimitRemaining,
+                $this->rateLimitLimit,
+            );
+        }
+
         $url = $this->baseUrl . self::API_PATH;
 
         try {
@@ -163,6 +226,7 @@ class JsonRpcClient
             ]);
 
             $this->requestCount++;
+            $this->trackRateLimitHeaders($response);
             $rawBody = $response->getBody()->getContents();
             $body = json_decode($rawBody, true);
 
@@ -200,6 +264,14 @@ class JsonRpcClient
                 $retryAfter = $response->getHeaderLine('Retry-After') ?: null;
                 $remaining = $response->getHeaderLine('X-RateLimit-Remaining') ?: null;
 
+                if ($this->onRateLimitCallback) {
+                    ($this->onRateLimitCallback)(
+                        $retryAfter ? (int) $retryAfter : null,
+                        $remaining ? (int) $remaining : null,
+                        429,
+                    );
+                }
+
                 throw new RateLimitException(
                     'Rate limit exceeded',
                     $retryAfter ? (int) $retryAfter : null,
@@ -207,6 +279,32 @@ class JsonRpcClient
                     429,
                     $e
                 );
+            }
+
+            // Gripp returns 503 with error_code 1004 for short-burst rate limits.
+            // These are transient — retry with a brief backoff before giving up.
+            if ($statusCode === 503) {
+                $body = $response ? json_decode($response->getBody()->getContents(), true) : null;
+                $errorCode = $body[0]['error_code'] ?? $body['error_code'] ?? null;
+
+                if ($errorCode === 1004) {
+                    if ($attempt < self::MAX_RETRIES) {
+                        sleep($attempt); // 1s, 2s backoff
+                        return $this->sendRequest($payload, $attempt + 1);
+                    }
+
+                    if ($this->onRateLimitCallback) {
+                        ($this->onRateLimitCallback)(null, null, 503);
+                    }
+
+                    throw new RateLimitException(
+                        'Too many requests in a short period of time',
+                        null,
+                        null,
+                        503,
+                        $e
+                    );
+                }
             }
 
             // Retry on 5xx errors
@@ -232,6 +330,20 @@ class JsonRpcClient
                 0,
                 $e
             );
+        }
+    }
+
+    protected function trackRateLimitHeaders($response): void
+    {
+        $remaining = $response->getHeaderLine('X-RateLimit-Remaining');
+        $limit = $response->getHeaderLine('X-RateLimit-Limit');
+
+        if ($remaining !== '') {
+            $this->rateLimitRemaining = (int) $remaining;
+        }
+
+        if ($limit !== '') {
+            $this->rateLimitLimit = (int) $limit;
         }
     }
 

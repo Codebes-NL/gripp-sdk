@@ -20,8 +20,8 @@ use Illuminate\Support\Collection;
  * - endswith: String ends with suffix
  * - greaterthan: Greater than (works with numbers, dates)
  * - lessthan: Less than
- * - greaterthanorequal: Greater than or equal to
- * - lessthanorequal: Less than or equal to
+ * - greaterequals: Greater than or equal to
+ * - lessequals: Less than or equal to
  * - in: Value is in the given array
  * - notin: Value is not in the given array
  * - isnull: Field is null (pass true as value)
@@ -60,8 +60,8 @@ class QueryBuilder
         'endswith',
         'greaterthan',
         'lessthan',
-        'greaterthanorequal',
-        'lessthanorequal',
+        'greaterequals',
+        'lessequals',
         'in',
         'notin',
         'isnull',
@@ -97,6 +97,50 @@ class QueryBuilder
         }
 
         return $this;
+    }
+
+    /**
+     * Filter where a date/datetime field falls between two values (inclusive).
+     *
+     * @param  string $field Date field name (e.g. 'createdon', 'date')
+     * @param  string $start Start date/datetime string
+     * @param  string $end   End date/datetime string
+     */
+    public function whereDateBetween(string $field, string $start, string $end): static
+    {
+        $this->where($field, 'greaterequals', $start);
+        $this->where($field, 'lessequals', $end);
+
+        return $this;
+    }
+
+    /**
+     * Filter where a date/datetime field falls within a given year.
+     */
+    public function whereYear(string $field, int $year): static
+    {
+        return $this->whereDateBetween($field, "{$year}-01-01 00:00:00", "{$year}-12-31 23:59:59");
+    }
+
+    /**
+     * Filter where a date/datetime field falls within a given month.
+     */
+    public function whereMonth(string $field, int $year, int $month): static
+    {
+        $startDate = sprintf('%d-%02d-01', $year, $month);
+        $endDate = date('Y-m-t', strtotime($startDate));
+
+        return $this->whereDateBetween($field, "{$startDate} 00:00:00", "{$endDate} 23:59:59");
+    }
+
+    /**
+     * Filter records modified on or after a given timestamp.
+     *
+     * Uses the 'updatedon' field by default (standard across all Gripp entities).
+     */
+    public function whereModifiedSince(\DateTimeInterface $date, string $field = 'updatedon'): static
+    {
+        return $this->where($field, 'greaterequals', $date->format('Y-m-d H:i:s'));
     }
 
     public function orderBy(string $field, string $direction = 'asc'): static
@@ -148,7 +192,16 @@ class QueryBuilder
 
     public function toFilterArray(): array
     {
-        return array_map(fn (Filter $filter) => $filter->toArray(), $this->filters);
+        return array_map(function (Filter $filter) {
+            $array = $filter->toArray();
+
+            // Auto-prefix entity name when the field is unqualified
+            if (! str_contains($array['field'], '.')) {
+                $array['field'] = $this->entity . '.' . $array['field'];
+            }
+
+            return $array;
+        }, $this->filters);
     }
 
     public function toOptionsArray(): array
@@ -178,6 +231,12 @@ class QueryBuilder
         $params = [$this->toFilterArray(), $this->toOptionsArray()];
         $transport = GrippClient::getTransport();
 
-        return $transport->call($method, $params);
+        // When an explicit limit is set, use a single call to respect it.
+        // Otherwise, auto-paginate to fetch all matching results.
+        if ($this->limit !== null) {
+            return $transport->call($method, $params);
+        }
+
+        return $transport->paginate($method, $params);
     }
 }
