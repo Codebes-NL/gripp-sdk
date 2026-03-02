@@ -39,14 +39,22 @@ src/
 - **JSON-RPC methods follow the pattern:** `{entity}.{action}` (e.g. `company.get`, `project.create`).
 - **The `Notification` resource is special** - it uses `emit()` and `emitall()` instead of standard CRUD.
 - **Features are computed logic, not API resources.** `Billability` aggregates Hour and OfferProjectLine data to calculate billable/non-billable time. Usage: `Billability::forEmployee(42, '2026-01-01', '2026-01-31')`.
+- **QueryBuilder auto-paginates.** `get()` fetches all pages automatically. Use `limit()` to restrict to a single page.
+- **QueryBuilder auto-prefixes entity names.** `Project::where('createdon', ...)` becomes `project.createdon` automatically. Fully qualified fields (`project.createdon`) are left as-is.
+- **Date helpers on QueryBuilder:** `whereDateBetween($field, $start, $end)`, `whereYear($field, $year)`, `whereMonth($field, $year, $month)`, `whereModifiedSince($date, $field = 'updatedon')`.
+- **Transport hooks:** `beforeRequest(callback)` fires before each HTTP call (throw to abort). `onRateLimitExceeded(callback)` fires on 429/503-1004 before the SDK throws.
+- **Rate limit tracking:** `getRateLimitRemaining()` and `getRateLimitLimit()` expose values from `X-RateLimit-*` response headers.
+- **503 with error_code 1004** is treated as a rate limit (Gripp's short-burst throttle), not a server error.
 
 ## Filter Operators
 
 When using `where($field, $operator, $value)`:
 
-equals, notequals, contains, notcontains, startswith, endswith, greaterthan, lessthan, greaterthanorequal, lessthanorequal, in, notin, isnull, isnotnull
+equals, notequals, contains, notcontains, startswith, endswith, greaterthan, lessthan, greaterequals, lessequals, in, notin, isnull, isnotnull
 
 Two-argument `where($field, $value)` defaults to `equals`.
+
+**Important:** The Gripp API uses `greaterequals` / `lessequals` (NOT `greaterthanorequal` / `lessthanorequal`).
 
 ## Development
 

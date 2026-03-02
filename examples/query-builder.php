@@ -29,7 +29,7 @@ $companies = Company::where('active', true)->get();
 //    Supported operators:
 //    equals, notequals, contains, notcontains,
 //    startswith, endswith, greaterthan, lessthan,
-//    greaterthanorequal, lessthanorequal,
+//    greaterequals, lessequals,
 //    in, notin, isnull, isnotnull
 // -----------------------------------------------
 

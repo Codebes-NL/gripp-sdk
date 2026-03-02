@@ -9,7 +9,9 @@ trait CanRead
 {
     public static function get(array $filters = [], array $options = []): Collection
     {
-        $response = static::rpcCall('get', [$filters, $options]);
+        $transport = \CodeBes\GrippSdk\GrippClient::getTransport();
+        $method = static::entity() . '.get';
+        $response = $transport->paginate($method, [$filters, $options]);
 
         return $response->toCollection();
     }
@@ -32,11 +34,7 @@ trait CanRead
 
     public static function all(): Collection
     {
-        $transport = \CodeBes\GrippSdk\GrippClient::getTransport();
-        $method = static::entity() . '.get';
-        $response = $transport->paginate($method, [[], []]);
-
-        return $response->toCollection();
+        return static::get();
     }
 
     public static function where(string $field, mixed $operatorOrValue, mixed $value = null): QueryBuilder

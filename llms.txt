@@ -37,8 +37,12 @@ The SDK follows a static facade pattern. All API calls go through a single confi
 `QueryBuilder` provides a fluent filter interface:
 - `where($field, $value)`  - equality filter
 - `where($field, $operator, $value)`  - operator filter
-- Operators: equals, notequals, contains, notcontains, startswith, endswith, greaterthan, lessthan, greaterthanorequal, lessthanorequal, in, notin, isnull, isnotnull
+- Operators: equals, notequals, contains, notcontains, startswith, endswith, greaterthan, lessthan, greaterequals, lessequals, in, notin, isnull, isnotnull
+- **Important:** The Gripp API uses `greaterequals`/`lessequals` (NOT `greaterthanorequal`/`lessthanorequal`)
 - Chain with `orderBy()`, `limit()`, `offset()`
+- Date helpers: `whereDateBetween()`, `whereYear()`, `whereMonth()`, `whereModifiedSince()`
+- Auto-prefixes entity name on unqualified fields (e.g. `'createdon'` → `'project.createdon'`)
+- `get()` auto-paginates by default; use `limit()` for single-page results
 - Terminate with `get()` (Collection), `first()` (?array), or `count()` (int)
 
 ### Exceptions
@@ -46,9 +50,15 @@ The SDK follows a static facade pattern. All API calls go through a single confi
 ```
 GrippException (base)
 ├── AuthenticationException (401/403)
-├── RateLimitException (429)
+├── RateLimitException (429 and 503 with error_code 1004)
 └── RequestException (other API errors)
 ```
+
+### Transport Hooks
+
+- `beforeRequest(callable)` - fires before each HTTP request with ($requestCount, $remaining, $limit). Throw to abort.
+- `onRateLimitExceeded(callable)` - fires on 429/503-1004 before SDK throws RateLimitException.
+- `getRateLimitRemaining()` / `getRateLimitLimit()` - values from response headers.
 
 ## Key Files
 

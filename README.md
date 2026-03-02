@@ -147,12 +147,57 @@ $count = Project::where('archived', false)->count();
 | `endswith` | String ends with |
 | `greaterthan` | Greater than |
 | `lessthan` | Less than |
-| `greaterthanorequal` | Greater than or equal to |
-| `lessthanorequal` | Less than or equal to |
+| `greaterequals` | Greater than or equal to |
+| `lessequals` | Less than or equal to |
 | `in` | Value is in array |
 | `notin` | Value is not in array |
 | `isnull` | Field is null (pass `true` as value) |
 | `isnotnull` | Field is not null (pass `true` as value) |
+
+### Date Helpers
+
+Common date filtering patterns are built into the query builder:
+
+```php
+use CodeBes\GrippSdk\Resources\Project;
+use CodeBes\GrippSdk\Resources\Hour;
+
+// Filter by year
+$projects = Project::where('archived', false)
+    ->whereYear('createdon', 2026)
+    ->get();
+
+// Filter by month
+$hours = Hour::where('employee', 42)
+    ->whereMonth('date', 2026, 3)
+    ->get();
+
+// Filter by date range
+$invoices = Invoice::where('company', 10)
+    ->whereDateBetween('date', '2026-01-01', '2026-03-31')
+    ->get();
+
+// Modified since (for incremental syncing)
+$updated = Project::where('archived', false)
+    ->whereModifiedSince(new DateTime('2026-03-01 00:00:00'))
+    ->get();
+```
+
+### Auto-Prefixing
+
+Field names are automatically prefixed with the entity name when using the query builder. Writing `Project::where('createdon', ...)` produces the filter field `project.createdon`. Fully qualified fields like `project.createdon` are left as-is.
+
+### Auto-Pagination
+
+Both `get()` and the query builder's `get()` automatically paginate through all results. Use `limit()` when you only want a specific number of results (single API call):
+
+```php
+// Fetches ALL matching projects across all pages
+$all = Project::where('archived', false)->get();
+
+// Fetches only the first 25 (single page)
+$page = Project::where('archived', false)->limit(25)->get();
+```
 
 ## Batch Operations
 
@@ -179,6 +224,33 @@ foreach ($responses as $response) {
     // Process each response...
 }
 ```
+
+## Rate Limit Awareness
+
+The transport tracks rate limit headers from API responses and provides hooks for proactive budget management:
+
+```php
+$transport = GrippClient::getTransport();
+
+// Check current rate limit state (from most recent response headers)
+$transport->getRateLimitRemaining(); // e.g. 847
+$transport->getRateLimitLimit();     // e.g. 1000
+
+// Abort requests when budget is low
+$transport->beforeRequest(function (int $requestCount, ?int $remaining, ?int $limit) {
+    if ($remaining !== null && $remaining <= 5) {
+        throw new \RuntimeException("Only {$remaining} API calls left!");
+    }
+});
+
+// React when a 429 or 503 rate limit hits
+$transport->onRateLimitExceeded(function (?int $retryAfter, ?int $remaining) {
+    // Set a flag, notify monitoring, etc.
+    Log::warning("Gripp rate limit hit, retry after {$retryAfter}s");
+});
+```
+
+The SDK treats both HTTP 429 and HTTP 503 with Gripp error code 1004 (short-burst throttle) as rate limit errors.
 
 ## Error Handling
 
@@ -296,11 +368,14 @@ Company::RELATIONS; // ['accountmanager' => Employee::class, 'tags' => Tag::clas
 
 ## Auto-Pagination
 
-The `all()` method automatically handles pagination, fetching all records transparently:
+Both `all()` and `get()` automatically handle pagination, fetching all matching records transparently:
 
 ```php
 // Fetches all companies, regardless of how many pages it takes
 $companies = Company::all(); // Returns Illuminate\Support\Collection
+
+// Filtered queries also auto-paginate
+$active = Company::where('active', true)->get(); // All pages
 ```
 
 ## Response Format
