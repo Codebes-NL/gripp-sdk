@@ -290,6 +290,7 @@ class JsonRpcClient
                 if ($errorCode === 1004) {
                     if ($attempt < self::MAX_RETRIES) {
                         sleep($attempt); // 1s, 2s backoff
+
                         return $this->sendRequest($payload, $attempt + 1);
                     }
 
