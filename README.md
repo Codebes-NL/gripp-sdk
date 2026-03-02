@@ -34,11 +34,10 @@ composer require codebes/gripp-sdk
 
 ### Option 1: Environment variables
 
-Set `GRIPP_API_TOKEN` and `GRIPP_API_URL` in your `.env` file or environment:
+Set `GRIPP_API_TOKEN` in your `.env` file or environment:
 
 ```env
 GRIPP_API_TOKEN=your-api-token
-GRIPP_API_URL=https://your-tenant.gripp.com
 ```
 
 Then call configure without arguments:
@@ -49,15 +48,14 @@ use CodeBes\GrippSdk\GrippClient;
 GrippClient::configure();
 ```
 
+The SDK uses `https://api.gripp.com` by default. To override, set `GRIPP_API_URL` in your environment.
+
 ### Option 2: Explicit configuration
 
 ```php
 use CodeBes\GrippSdk\GrippClient;
 
-GrippClient::configure(
-    token: 'your-api-token',
-    baseUrl: 'https://your-tenant.gripp.com'
-);
+GrippClient::configure(token: 'your-api-token');
 ```
 
 ### Option 3: Interactive setup

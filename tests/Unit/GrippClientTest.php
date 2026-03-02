@@ -22,6 +22,14 @@ class GrippClientTest extends TestCase
         $this->assertEquals('https://api.gripp.com', GrippClient::getBaseUrl());
     }
 
+    public function test_configure_uses_default_base_url(): void
+    {
+        GrippClient::configure('test-token');
+
+        $this->assertEquals('test-token', GrippClient::getToken());
+        $this->assertEquals('https://api.gripp.com', GrippClient::getBaseUrl());
+    }
+
     public function test_configure_reads_from_env(): void
     {
         $_ENV['GRIPP_API_TOKEN'] = 'env-token';
