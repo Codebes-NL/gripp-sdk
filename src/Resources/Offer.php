@@ -61,8 +61,9 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  * @property      int    $umbrellaproject            FK → UmbrellaProject.
  * @property      bool   $isopportunity              Is opportunity.
  *
- * @deprecated property $validity   Replaced by validfor.
- * @deprecated property $identity   Replaced by template.
+ * Removed legacy properties:
+ * - $validity — replaced by $validfor.
+ * - $identity — replaced by $template.
  */
 class Offer extends Resource
 {

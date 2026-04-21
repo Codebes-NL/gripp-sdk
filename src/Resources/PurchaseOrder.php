@@ -42,7 +42,8 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  * @property      int    $accountmanager         FK → Employee.
  * @property      array  $purchaseorderlines     FK[] → PurchaseOrderLine.
  *
- * @deprecated property $identity Replaced by templateset.
+ * Removed legacy properties:
+ * - $identity — replaced by $templateset.
  */
 class PurchaseOrder extends Resource
 {
