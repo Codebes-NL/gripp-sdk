@@ -284,7 +284,8 @@ class JsonRpcClient
             // Gripp returns 503 with error_code 1004 for short-burst rate limits.
             // These are transient — retry with a brief backoff before giving up.
             if ($statusCode === 503) {
-                $body = $response ? json_decode($response->getBody()->getContents(), true) : null;
+                // $response is guaranteed non-null here: $statusCode was derived from it above.
+                $body = json_decode($response->getBody()->getContents(), true);
                 $errorCode = $body[0]['error_code'] ?? $body['error_code'] ?? null;
 
                 if ($errorCode === 1004) {
