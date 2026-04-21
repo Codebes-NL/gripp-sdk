@@ -72,7 +72,8 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  * @property      array  $projectlines            FK[] → OfferProjectLine.
  * @property      int    $umbrellaproject         FK → UmbrellaProject.
  *
- * @deprecated property $identity Replaced by templateset.
+ * Removed legacy properties:
+ * - $identity — replaced by $templateset.
  */
 class Project extends Resource
 {
