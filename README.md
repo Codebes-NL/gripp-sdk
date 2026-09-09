@@ -175,11 +175,22 @@ $invoices = Invoice::where('company', 10)
     ->whereDateBetween('date', '2026-01-01', '2026-03-31')
     ->get();
 
-// Modified since (for incremental syncing)
+// Created or modified since (for incremental syncing)
 $updated = Project::where('archived', false)
     ->whereModifiedSince(new DateTime('2026-03-01 00:00:00'))
     ->get();
+
+// Start a query without a filter, when the first thing you need is a helper
+$recent = Hour::query()
+    ->whereModifiedSince(new DateTime('2026-03-01 00:00:00'))
+    ->get();
 ```
+
+> **`whereModifiedSince()` sends two requests, on purpose.** Gripp leaves `updatedon`
+> empty on records that were created and never edited afterwards, so filtering on
+> `updatedon` alone silently omits every untouched record. The correct condition is
+> `updatedon >= $date OR createdon >= $date`, and the Gripp API has no OR - every
+> filter in the array is ANDed. So the SDK runs both halves and merges them on `id`.
 
 ### Auto-Prefixing
 

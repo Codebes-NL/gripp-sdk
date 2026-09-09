@@ -3,6 +3,7 @@
 namespace CodeBes\GrippSdk\Query;
 
 use CodeBes\GrippSdk\GrippClient;
+use CodeBes\GrippSdk\Transport\JsonRpcClient;
 use CodeBes\GrippSdk\Transport\JsonRpcResponse;
 use Illuminate\Support\Collection;
 
@@ -81,6 +82,16 @@ class QueryBuilder
 
     protected ?int $offset = null;
 
+    /**
+     * Set by whereModifiedSince(). Holds [DateTimeInterface, updatedField, createdField].
+     *
+     * Not a plain filter, because it cannot be expressed as one - see
+     * whereModifiedSince() for why, and execute() for how it is resolved.
+     *
+     * @var array{0: \DateTimeInterface, 1: string, 2: string}|null
+     */
+    protected ?array $modifiedSince = null;
+
     public function __construct(string $resourceClass, string $entity)
     {
         $this->resourceClass = $resourceClass;
@@ -134,13 +145,33 @@ class QueryBuilder
     }
 
     /**
-     * Filter records modified on or after a given timestamp.
+     * Filter records created or modified on or after a given timestamp.
      *
-     * Uses the 'updatedon' field by default (standard across all Gripp entities).
+     * **This is not a single filter, and it cannot be.** Gripp leaves `updatedon`
+     * empty on records that were created and never edited afterwards, so a plain
+     * `updatedon >= $date` silently omits every record that has never been touched
+     * since it was written. Measured against a live account in September 2026: of
+     * the hour rows an incremental sync failed to pick up, 749 out of 749 had an
+     * empty `updatedon`, while all 889 rows it did pick up had one. Those were all
+     * draft hours - written once, never edited until approval - so they stayed
+     * invisible for months and the totals silently drifted from Gripp's own report.
+     *
+     * The correct condition is `updatedon >= $date OR createdon >= $date`, and the
+     * Gripp API has no OR: every filter in the array is ANDed. So execute() runs the
+     * two halves as separate queries and merges them on `id`. That costs one extra
+     * round trip per page, which is the price of a correct answer.
+     *
+     * @param  string $field        Modification timestamp field.
+     * @param  string $createdField Creation timestamp field, queried alongside it.
      */
-    public function whereModifiedSince(\DateTimeInterface $date, string $field = 'updatedon'): static
-    {
-        return $this->where($field, 'greaterequals', $date->format('Y-m-d H:i:s'));
+    public function whereModifiedSince(
+        \DateTimeInterface $date,
+        string $field = 'updatedon',
+        string $createdField = 'createdon'
+    ): static {
+        $this->modifiedSince = [$date, $field, $createdField];
+
+        return $this;
     }
 
     public function orderBy(string $field, string $direction = 'asc'): static
@@ -228,8 +259,14 @@ class QueryBuilder
     protected function execute(): JsonRpcResponse
     {
         $method = $this->entity . '.get';
-        $params = [$this->toFilterArray(), $this->toOptionsArray()];
         $transport = GrippClient::getTransport();
+        $options = $this->toOptionsArray();
+
+        if ($this->modifiedSince !== null) {
+            return $this->executeModifiedSince($method, $transport, $options);
+        }
+
+        $params = [$this->toFilterArray(), $options];
 
         // When an explicit limit is set, use a single call to respect it.
         // Otherwise, auto-paginate to fetch all matching results.
@@ -238,5 +275,69 @@ class QueryBuilder
         }
 
         return $transport->paginate($method, $params);
+    }
+
+    /**
+     * Resolve whereModifiedSince() as the union of two queries.
+     *
+     * One half matches records edited since the timestamp, the other records
+     * created since it. A record that was created and then edited matches both,
+     * so the halves are merged on `id` rather than concatenated.
+     */
+    protected function executeModifiedSince(string $method, JsonRpcClient $transport, array $options): JsonRpcResponse
+    {
+        [$date, $updatedField, $createdField] = $this->modifiedSince;
+        $timestamp = $date->format('Y-m-d H:i:s');
+        $baseFilters = $this->toFilterArray();
+
+        $byId = [];
+        foreach ([$updatedField, $createdField] as $field) {
+            $filters = $baseFilters;
+            $filters[] = $this->qualify([
+                'field' => $field,
+                'operator' => 'greaterequals',
+                'value' => $timestamp,
+            ]);
+
+            $params = [$filters, $options];
+            $response = $this->limit !== null
+                ? $transport->call($method, $params)
+                : $transport->paginate($method, $params);
+
+            foreach ($response->rows() as $row) {
+                // Rows without an id cannot be deduplicated; keep them all.
+                $key = $row['id'] ?? count($byId);
+                $byId[$key] = $row;
+            }
+        }
+
+        $rows = array_values($byId);
+
+        // An explicit limit applies to the union, not to each half.
+        if ($this->limit !== null) {
+            $rows = array_slice($rows, 0, $this->limit);
+        }
+
+        return new JsonRpcResponse([
+            'id' => 0,
+            'result' => [
+                'rows' => $rows,
+                'count' => count($rows),
+                'start' => 0,
+                'more_items_in_collection' => false,
+            ],
+        ]);
+    }
+
+    /**
+     * Apply the same entity prefixing toFilterArray() does to a raw filter array.
+     */
+    protected function qualify(array $filter): array
+    {
+        if (! str_contains($filter['field'], '.')) {
+            $filter['field'] = $this->entity . '.' . $filter['field'];
+        }
+
+        return $filter;
     }
 }

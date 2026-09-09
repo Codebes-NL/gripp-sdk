@@ -41,7 +41,9 @@ src/
 - **Features are computed logic, not API resources.** `Billability` aggregates Hour and OfferProjectLine data to calculate billable/non-billable time. Usage: `Billability::forEmployee(42, '2026-01-01', '2026-01-31')`.
 - **QueryBuilder auto-paginates.** `get()` fetches all pages automatically. Use `limit()` to restrict to a single page.
 - **QueryBuilder auto-prefixes entity names.** `Project::where('createdon', ...)` becomes `project.createdon` automatically. Fully qualified fields (`project.createdon`) are left as-is.
-- **Date helpers on QueryBuilder:** `whereDateBetween($field, $start, $end)`, `whereYear($field, $year)`, `whereMonth($field, $year, $month)`, `whereModifiedSince($date, $field = 'updatedon')`.
+- **Date helpers on QueryBuilder:** `whereDateBetween($field, $start, $end)`, `whereYear($field, $year)`, `whereMonth($field, $year, $month)`, `whereModifiedSince($date, $field = 'updatedon', $createdField = 'createdon')`.
+- **`whereModifiedSince()` is not a single filter.** Gripp leaves `updatedon` empty on records created but never edited, and its filter array is ANDed with no OR available, so the builder issues two queries (`updatedon >= $date` and `createdon >= $date`) and merges them on `id`. Filtering on `updatedon` alone loses every untouched record - that is how incremental syncs silently drifted from Gripp's own totals for months.
+- **`Resource::query()`** starts a builder without a filter, for when the first thing you need is `whereModifiedSince()`, `orderBy()` or `limit()`. `where()` goes through it.
 - **Transport hooks:** `beforeRequest(callback)` fires before each HTTP call (throw to abort). `onRateLimitExceeded(callback)` fires on 429/503-1004 before the SDK throws.
 - **Rate limit tracking:** `getRateLimitRemaining()` and `getRateLimitLimit()` expose values from `X-RateLimit-*` response headers.
 - **503 with error_code 1004** is treated as a rate limit (Gripp's short-burst throttle), not a server error.

@@ -37,11 +37,20 @@ trait CanRead
         return static::get();
     }
 
+    /**
+     * Start a query without committing to a filter yet.
+     *
+     * where() is the usual entry point, but some builder methods stand on their
+     * own - whereModifiedSince(), orderBy(), limit() - and those had no way in.
+     */
+    public static function query(): QueryBuilder
+    {
+        return new QueryBuilder(static::class, static::entity());
+    }
+
     public static function where(string $field, mixed $operatorOrValue, mixed $value = null): QueryBuilder
     {
-        $builder = new QueryBuilder(static::class, static::entity());
-
-        return $builder->where($field, $operatorOrValue, $value);
+        return static::query()->where($field, $operatorOrValue, $value);
     }
 
     public static function first(array $filters = []): ?array
