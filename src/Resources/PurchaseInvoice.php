@@ -29,7 +29,9 @@ use CodeBes\GrippSdk\Resources\Concerns\CanUpdate;
  * @property      int    $bookingnumber                  Booking number.
  * @property      int    $identity                       FK → Identity (required). Settings > Identiteiten & Sjablonen.
  * @property      string $description                    Description.
- * @property-read float  $totalincldiscountinclvat       Total incl. discount incl. VAT.
+ * @property-read float  $totalincldiscountinclvat       Total incl. discount EXCLUDING VAT, despite the name.
+ *                                                       Verified 40/40 against the sum of lines excl. VAT
+ *                                                       (lines at 21%, 9% and 0%). Use $totalinclvat for incl. VAT.
  * @property-read float  $totalopeninclvat               Total open incl. VAT.
  * @property      string $extendedproperties             Extended properties.
  * @property      array  $tags                           FK[] → Tag.
