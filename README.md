@@ -18,6 +18,7 @@ A PHP SDK for the [Gripp](https://www.gripp.com) (now [Exact Gripp](https://www.
 - Typed exceptions for authentication, rate limiting, and API errors
 - Laravel Collection responses out of the box
 - Self-documenting resources with field types, required fields, and relationship metadata
+- Billability (declarabiliteit) and invoiceability (facturabiliteit) calculations, with an explicit account of what is exact and what is estimated
 
 ## Requirements
 
@@ -399,6 +400,67 @@ $names = $companies->pluck('companyname');
 $grouped = $companies->groupBy('visitingaddress_city');
 $first = $companies->first();
 ```
+
+## Billability and Invoiceability
+
+`CodeBes\GrippSdk\Features\Billability` computes two measures from hours, project lines and invoice lines. In Dutch they have different names, and they answer different questions.
+
+| Measure | Dutch | Question | Formula |
+|---|---|---|---|
+| Billability | declarabiliteit | How much of the time went to paid work? | hours on paid project lines / all hours |
+| Invoiceability | facturabiliteit | How much of the paid work was actually invoiced? | invoiced hours / hours on paid project lines |
+
+Ten hours on a paid project line are 100% billable. If five of them end up on an invoice, invoiceability is 50%.
+
+```php
+use CodeBes\GrippSdk\Features\Billability;
+
+Billability::forEmployee(42, '2025-01-01', '2025-12-31');               // billability
+Billability::forTeam('2025-01-01', '2025-12-31');
+
+Billability::invoiceabilityForEmployee(42, '2025-01-01', '2025-12-31'); // invoiceability
+Billability::invoiceabilityForTeam('2025-01-01', '2025-12-31');         // per employee and in total
+```
+
+### Why invoiceability is exact for some hours and estimated for others
+
+Whether an hour counts as invoiced depends on the invoice basis (`invoicebasis`) of the project line it was written on, because Gripp records the link between hours and invoices differently per basis:
+
+| Invoice basis | Dutch | How Gripp links the invoice | Precision |
+|---|---|---|---|
+| `COSTING` | Nacalculatie | Every invoiced hour carries `hour.invoiceline`. | Exact, per hour |
+| `BUDGETED` | Begroot | Every invoiced hour carries `hour.invoiceline`. | Exact, per hour |
+| `FIXED` | Fixed | No hour ever carries `hour.invoiceline`. The invoice line points at the project line (`invoiceline.part`) with a quantity. | Exact per project line; per person only when one person worked on the line |
+| `NONBILLABLE` | Niet doorbelasten | Not invoiced. | Not part of invoiceability |
+
+This was verified against a full year of live Gripp data: for Nacalculatie and Begroot, the quantity on every invoice line in hours equals the sum of the hours linked to it, and not a single hour on a Fixed line had an invoice line. The limit is in how Gripp records Fixed invoicing, not in the SDK. No API call can tell who a Fixed invoice line was for.
+
+For Fixed lines the SDK therefore works per project line:
+
+1. **Over the line's whole life.** All hours ever written on the line are set against all hour quantities ever invoiced on it, regardless of the requested period. Fixed work is often invoiced up front or in instalments, so comparing within one period would pair invoices with the wrong work.
+2. **Not capped at the hours worked.** Sell and invoice 35 hours, work 10, and those 10 hours count as 35 invoiced hours: 350% on that line.
+3. **Split pro rata when a line is shared.** When several people wrote hours on the line, each of their hours gets the line's ratio of invoiced hours to hours written. This is the only assumption in the calculation: totals per line, per project and per team add up exactly.
+4. **Credit lines count negative** on the project line they point at.
+5. **Lines invoiced in other units are left out.** Pieces (`stuks`), a fixed price (`prijs`) or any unit other than `uur` has no hour quantity to compare with. `Unit.hoursperunit` does not help, because Gripp returns 1 for every unit. These hours are reported as `unmeasurable_hours` and excluded from the percentage.
+
+Every invoiceability result says how much of it is exact:
+
+| Key | Meaning |
+|---|---|
+| `billable_hours` | Hours on Fixed, Nacalculatie and Begroot lines |
+| `invoiced_hours` | Invoiced hours as described above; can exceed the hours worked on Fixed lines |
+| `uninvoiced_hours` | Billable hours not covered by invoicing |
+| `exact_hours` | Nacalculatie and Begroot hours, and Fixed hours on lines that one person worked on or that were never invoiced |
+| `estimated_hours` | Fixed hours on shared, invoiced lines, split pro rata |
+| `unmeasurable_hours` | Fixed hours on lines invoiced in units other than hours |
+| `invoiceability_percentage` | `invoiced_hours / (billable_hours - unmeasurable_hours) * 100` |
+| `by_invoice_basis` | Billable and invoiced hours per invoice basis |
+
+To make Fixed work exact per person, it has to be recorded differently in Gripp: one project line per person on Fixed projects, or the Begroot basis, where Gripp does link hours to invoices.
+
+> **Cost.** Invoiceability fetches the period's hours, plus the lifetime hours and invoice lines of every Fixed line in the period, 100 lines per request. For a team of about twenty people over a full year that took 206 API calls, around 100 seconds and 212 MB of memory, above PHP's default `memory_limit` of 128 MB. Raise the limit, or ask per employee or per quarter and add up the hours. `forTeam()` loads the same hours and needs the same memory.
+
+`uninvoicedHours()` lists hours without `hour.invoiceline`. That includes every hour on a Fixed line, invoiced or not, so do not use it to find uninvoiced Fixed work.
 
 ## Testing
 
