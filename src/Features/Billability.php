@@ -6,13 +6,23 @@ use CodeBes\GrippSdk\GrippClient;
 use Illuminate\Support\Collection;
 
 /**
- * Billability (declarabiliteit) calculations.
+ * Billability (declarabiliteit) and invoiceability (facturabiliteit) calculations.
  *
- * Computed feature that aggregates data from Hour and OfferProjectLine resources
- * to calculate billable vs non-billable time for employees, teams, and projects.
+ * Computed feature that aggregates Hour, OfferProjectLine and InvoiceLine data for
+ * employees, teams, and projects. The two measures answer different questions:
  *
- * An hour is billable when its linked OfferProjectLine has invoicebasis != 'NONBILLABLE'.
- * An hour is uninvoiced when status is DEFINITIVE or AUTHORIZED and invoiceline is null.
+ * - Billability: hours on paid project lines / all hours. An hour is billable when its
+ *   OfferProjectLine has an invoice basis other than NONBILLABLE.
+ * - Invoiceability: invoiced hours / hours on paid project lines. Ten hours on a paid
+ *   line are 100% billable; if five of them are invoiced, invoiceability is 50%.
+ *
+ * Invoiceability is exact per hour only on COSTING (Nacalculatie) and BUDGETED (Begroot)
+ * lines, where Gripp sets hour.invoiceline on every invoiced hour. On FIXED lines Gripp
+ * never does: the invoice line points at the project line (invoiceline.part) with a
+ * quantity, so who the invoiced hours were for is recorded nowhere. Fixed lines are
+ * therefore compared per line over their whole life and split pro rata over the people
+ * who wrote hours on them. See invoiceabilityForEmployee() and the README section
+ * "Billability and Invoiceability".
  *
  * @example
  * // Employee billability for January
@@ -25,12 +35,12 @@ use Illuminate\Support\Collection;
  * // Project utilization
  * $project = Billability::forProject(99);
  *
- * // Find uninvoiced hours
+ * // Find hours without an invoice line (every Fixed hour is among them)
  * $uninvoiced = Billability::uninvoicedHours('2026-01-01', '2026-01-31');
  *
- * // Invoiceability (facturabiliteit) - what % of billable hours are actually invoiced
+ * // Invoiceability (facturabiliteit) - what share of the paid hours was invoiced
  * $inv = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
- * // $inv['invoiceability_percentage'] => 45.4
+ * // $inv['invoiceability_percentage'] => 45.4, $inv['estimated_hours'] => 12.0
  *
  * $teamInv = Billability::invoiceabilityForTeam('2026-01-01', '2026-01-31');
  */
@@ -48,7 +58,11 @@ class Billability
      * Invoice basis IDs in the Gripp API.
      * 1 = Fixed, 2 = Nacalculatie (Costing), 3 = Begroot (Budgeted), 4 = Niet doorbelasten (Non-billable).
      */
+    private const INVOICEBASIS_FIXED = 1;
+
     private const INVOICEBASIS_COSTING = 2;
+
+    private const INVOICEBASIS_BUDGETED = 3;
 
     private const INVOICEBASIS_NONBILLABLE = 4;
 
@@ -58,6 +72,22 @@ class Billability
         3 => 'BUDGETED',
         4 => 'NONBILLABLE',
     ];
+
+    /**
+     * Unit ID of "uur" (hour). Only invoice lines in this unit carry an hour quantity.
+     * Unit.hoursperunit is 1 for every unit, pieces and price included, so it cannot
+     * convert anything else to hours.
+     */
+    private const UNIT_HOUR = 1;
+
+    /** Project line IDs per `in` filter when looking up Fixed lines. */
+    private const LINE_BATCH_SIZE = 100;
+
+    private const PRECISION_EXACT = 'exact';
+
+    private const PRECISION_ESTIMATED = 'estimated';
+
+    private const PRECISION_UNMEASURABLE = 'unmeasurable';
 
     /**
      * Calculate billability for a single employee within a date range.
@@ -260,14 +290,24 @@ class Billability
     }
 
     /**
-     * Calculate invoiceability (facturabiliteit) for a single employee.
+     * Calculate invoiceability (facturabiliteit) for a single employee within a date range.
      *
-     * Measures what percentage of billable hours have actually been invoiced.
-     * Handles all invoice basis types correctly:
-     * - COSTING: checks hour.invoiceline (hours are individually linked to invoices)
-     * - FIXED/BUDGETED: checks if the offerprojectline has been invoiced via InvoiceLine.part
+     * How an hour counts as invoiced depends on the invoice basis of its project line:
      *
-     * @return array{employee_id: int, from: string, to: string, total_hours: float, billable_hours: float, invoiced_hours: float, uninvoiced_hours: float, invoiceability_percentage: float, by_project: array}
+     * - COSTING and BUDGETED: invoiced when hour.invoiceline is set. Exact, per hour.
+     * - FIXED: Gripp never sets hour.invoiceline. The hour counts for the invoiced share of
+     *   its project line: every hour quantity ever invoiced on the line (invoiceline.part,
+     *   unit "uur", credit lines negative) divided by every hour ever written on it, in any
+     *   period. Not capped: 35 invoiced hours on 10 worked count as 35. That share is exact
+     *   when one person worked on the line or it was never invoiced, and an estimate - split
+     *   pro rata over the people on the line - when several people share an invoiced line.
+     *   A line invoiced in another unit (pieces, price) has no hour quantity: its hours are
+     *   unmeasurable and left out of the percentage.
+     *
+     * invoiceability_percentage = invoiced_hours / (billable_hours - unmeasurable_hours) * 100.
+     * exact_hours, estimated_hours and unmeasurable_hours add up to billable_hours.
+     *
+     * @return array{employee_id: int, from: string, to: string, total_hours: float, billable_hours: float, invoiced_hours: float, uninvoiced_hours: float, exact_hours: float, estimated_hours: float, unmeasurable_hours: float, invoiceability_percentage: float, by_invoice_basis: array, by_project: array}
      */
     public static function invoiceabilityForEmployee(int $employeeId, string $from, string $to): array
     {
@@ -276,80 +316,51 @@ class Billability
             ['field' => 'hour.date', 'operator' => 'between', 'value' => $from, 'value2' => $to],
         ]);
 
-        $lineLookup = self::resolveLineInvoiceBasis($hours);
-        $invoicedLines = self::resolveInvoicedLines($hours, $from, $to);
-
-        $totalHours = 0.0;
-        $billableHours = 0.0;
-        $invoicedHours = 0.0;
-        $uninvoicedHours = 0.0;
+        $totals = self::emptyInvoiceabilityTotals();
+        $byBasis = self::emptyBasisTotals();
         $byProject = [];
 
-        foreach ($hours as $hour) {
-            $amount = (float) ($hour['amount'] ?? 0);
-            $totalHours += $amount;
+        foreach (self::measureInvoicedHours($hours) as $measured) {
+            self::addToTotals($totals, $measured);
+            self::addToBasis($byBasis, $measured);
 
-            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
-            $invoiceBasisId = $lineId ? ($lineLookup[$lineId] ?? null) : null;
-            $isBillable = $invoiceBasisId !== null && $invoiceBasisId !== self::INVOICEBASIS_NONBILLABLE;
-
-            if (! $isBillable) {
+            $projectId = self::resolveId($measured['hour']['offerprojectbase'] ?? null);
+            if (! $measured['billable'] || $projectId === null) {
                 continue;
             }
 
-            $billableHours += $amount;
-            $isInvoiced = self::isHourInvoiced($hour, $lineId, $invoiceBasisId, $invoicedLines);
-
-            if ($isInvoiced) {
-                $invoicedHours += $amount;
-            } else {
-                $uninvoicedHours += $amount;
-            }
-
-            $projectId = self::resolveId($hour['offerprojectbase'] ?? null);
-            if ($projectId !== null) {
-                if (! isset($byProject[$projectId])) {
-                    $byProject[$projectId] = [
-                        'offerprojectbase_id' => $projectId,
-                        'billable_hours' => 0.0,
-                        'invoiced_hours' => 0.0,
-                        'uninvoiced_hours' => 0.0,
-                    ];
-                }
-                $byProject[$projectId]['billable_hours'] += $amount;
-                if ($isInvoiced) {
-                    $byProject[$projectId]['invoiced_hours'] += $amount;
-                } else {
-                    $byProject[$projectId]['uninvoiced_hours'] += $amount;
-                }
-            }
+            $byProject[$projectId] ??= [
+                'offerprojectbase_id' => $projectId,
+                'billable_hours' => 0.0,
+                'invoiced_hours' => 0.0,
+                'uninvoiced_hours' => 0.0,
+            ];
+            $byProject[$projectId]['billable_hours'] += $measured['amount'];
+            $byProject[$projectId]['invoiced_hours'] += $measured['invoiced'];
+            $byProject[$projectId]['uninvoiced_hours'] += $measured['uninvoiced'];
         }
 
         return [
             'employee_id' => $employeeId,
             'from' => $from,
             'to' => $to,
-            'total_hours' => $totalHours,
-            'billable_hours' => $billableHours,
-            'invoiced_hours' => $invoicedHours,
-            'uninvoiced_hours' => $uninvoicedHours,
-            'invoiceability_percentage' => $totalHours > 0
-                ? round(($invoicedHours / $totalHours) * 100, 1)
-                : 0.0,
-            'by_project' => array_values($byProject),
+            ...self::finishTotals($totals),
+            'by_invoice_basis' => self::roundHours($byBasis),
+            'by_project' => array_values(array_map(fn (array $project) => self::roundHours($project), $byProject)),
         ];
     }
 
     /**
      * Calculate invoiceability (facturabiliteit) for a team.
      *
-     * Measures what percentage of billable hours have actually been invoiced
-     * across multiple employees. See invoiceabilityForEmployee for invoicing logic.
+     * Same rules as invoiceabilityForEmployee(). A shared Fixed line is split between the
+     * employees on it in proportion to the hours each wrote there, so the per-employee
+     * invoiced hours add up to the team total.
      *
      * @param  string     $from        Start date (Y-m-d)
      * @param  string     $to          End date (Y-m-d)
      * @param  int[]|null $employeeIds Employee IDs to include, or null for all
-     * @return array{from: string, to: string, total_hours: float, billable_hours: float, invoiced_hours: float, uninvoiced_hours: float, invoiceability_percentage: float, by_employee: array}
+     * @return array{from: string, to: string, total_hours: float, billable_hours: float, invoiced_hours: float, uninvoiced_hours: float, exact_hours: float, estimated_hours: float, unmeasurable_hours: float, invoiceability_percentage: float, by_invoice_basis: array, by_employee: array}
      */
     public static function invoiceabilityForTeam(string $from, string $to, ?array $employeeIds = null): array
     {
@@ -362,86 +373,40 @@ class Billability
         }
 
         $hours = self::paginatedQuery('hour', $filters);
-        $lineLookup = self::resolveLineInvoiceBasis($hours);
-        $invoicedLines = self::resolveInvoicedLines($hours, $from, $to);
 
-        $totalHours = 0.0;
-        $billableHours = 0.0;
-        $invoicedHours = 0.0;
-        $uninvoicedHours = 0.0;
+        $totals = self::emptyInvoiceabilityTotals();
+        $byBasis = self::emptyBasisTotals();
         $byEmployee = [];
 
-        foreach ($hours as $hour) {
-            $amount = (float) ($hour['amount'] ?? 0);
-            $totalHours += $amount;
+        foreach (self::measureInvoicedHours($hours) as $measured) {
+            self::addToTotals($totals, $measured);
+            self::addToBasis($byBasis, $measured);
 
-            $empId = self::resolveId($hour['employee'] ?? null);
-            if ($empId !== null && ! isset($byEmployee[$empId])) {
-                $byEmployee[$empId] = [
-                    'employee_id' => $empId,
-                    'total_hours' => 0.0,
-                    'billable_hours' => 0.0,
-                    'invoiced_hours' => 0.0,
-                    'uninvoiced_hours' => 0.0,
-                    'invoiceability_percentage' => 0.0,
-                ];
-            }
-            if ($empId !== null) {
-                $byEmployee[$empId]['total_hours'] += $amount;
-            }
-
-            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
-            $invoiceBasisId = $lineId ? ($lineLookup[$lineId] ?? null) : null;
-            $isBillable = $invoiceBasisId !== null && $invoiceBasisId !== self::INVOICEBASIS_NONBILLABLE;
-
-            if (! $isBillable) {
+            $empId = self::resolveId($measured['hour']['employee'] ?? null);
+            if ($empId === null) {
                 continue;
             }
 
-            $billableHours += $amount;
-            $isInvoiced = self::isHourInvoiced($hour, $lineId, $invoiceBasisId, $invoicedLines);
-
-            if ($isInvoiced) {
-                $invoicedHours += $amount;
-            } else {
-                $uninvoicedHours += $amount;
-            }
-
-            if ($empId !== null) {
-                $byEmployee[$empId]['billable_hours'] += $amount;
-                if ($isInvoiced) {
-                    $byEmployee[$empId]['invoiced_hours'] += $amount;
-                } else {
-                    $byEmployee[$empId]['uninvoiced_hours'] += $amount;
-                }
-            }
+            $byEmployee[$empId] ??= ['employee_id' => $empId] + self::emptyInvoiceabilityTotals();
+            self::addToTotals($byEmployee[$empId], $measured);
         }
-
-        foreach ($byEmployee as &$emp) {
-            $emp['invoiceability_percentage'] = $emp['total_hours'] > 0
-                ? round(($emp['invoiced_hours'] / $emp['total_hours']) * 100, 1)
-                : 0.0;
-        }
-        unset($emp);
 
         return [
             'from' => $from,
             'to' => $to,
-            'total_hours' => $totalHours,
-            'billable_hours' => $billableHours,
-            'invoiced_hours' => $invoicedHours,
-            'uninvoiced_hours' => $uninvoicedHours,
-            'invoiceability_percentage' => $totalHours > 0
-                ? round(($invoicedHours / $totalHours) * 100, 1)
-                : 0.0,
-            'by_employee' => array_values($byEmployee),
+            ...self::finishTotals($totals),
+            'by_invoice_basis' => self::roundHours($byBasis),
+            'by_employee' => array_values(array_map(fn (array $employee) => self::finishTotals($employee), $byEmployee)),
         ];
     }
 
     /**
-     * Find uninvoiced hours within a date range.
+     * Find hours without an invoice line within a date range.
      *
-     * Uninvoiced hours have status DEFINITIVE or AUTHORIZED and no linked invoice line.
+     * Returns hours with status DEFINITIVE or AUTHORIZED and no hour.invoiceline. Gripp never
+     * sets hour.invoiceline on FIXED project lines, so every Fixed hour is listed here whether
+     * its line was invoiced or not. Use invoiceabilityForEmployee() / invoiceabilityForTeam()
+     * to see what was actually invoiced.
      *
      * @return array{from: string, to: string, total_hours: float, hours: array}
      */
@@ -529,58 +494,224 @@ class Billability
     }
 
     /**
-     * Determine if a billable hour has been invoiced.
+     * Work out, per hour, whether it is billable, how many hours of it were invoiced and how
+     * sure that is.
      *
-     * - COSTING: hour is invoiced when hour.invoiceline is set (hour-level billing)
-     * - FIXED/BUDGETED: hour is invoiced when its offerprojectline appears in InvoiceLine.part
-     *
-     * @param  array<int, bool> $invoicedLines Set of offerprojectline IDs that have been invoiced
+     * @return list<array{hour: array, amount: float, billable: bool, basis: ?string, invoiced: float, uninvoiced: float, precision: string}>
      */
-    private static function isHourInvoiced(array $hour, ?int $lineId, ?int $invoiceBasisId, array $invoicedLines): bool
+    private static function measureInvoicedHours(Collection $hours): array
     {
-        if ($invoiceBasisId === self::INVOICEBASIS_COSTING) {
-            return $hour['invoiceline'] !== null;
+        $lineLookup = self::resolveLineInvoiceBasis($hours);
+
+        $fixedLineIds = [];
+        foreach ($hours as $hour) {
+            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
+            if ($lineId !== null && ($lineLookup[$lineId] ?? null) === self::INVOICEBASIS_FIXED) {
+                $fixedLineIds[$lineId] = $lineId;
+            }
+        }
+        $fixedLines = self::resolveFixedLines(array_values($fixedLineIds));
+
+        $measured = [];
+        foreach ($hours as $hour) {
+            $amount = (float) ($hour['amount'] ?? 0);
+            $lineId = self::resolveId($hour['offerprojectline'] ?? null);
+            $basisId = $lineId !== null ? ($lineLookup[$lineId] ?? null) : null;
+
+            $row = [
+                'hour' => $hour,
+                'amount' => $amount,
+                'billable' => $basisId !== null && $basisId !== self::INVOICEBASIS_NONBILLABLE,
+                'basis' => $basisId !== null ? (self::INVOICEBASIS_LABELS[$basisId] ?? null) : null,
+                'invoiced' => 0.0,
+                'uninvoiced' => 0.0,
+                'precision' => self::PRECISION_EXACT,
+            ];
+
+            if ($basisId === self::INVOICEBASIS_COSTING || $basisId === self::INVOICEBASIS_BUDGETED) {
+                $row['invoiced'] = (self::resolveId($hour['invoiceline'] ?? null) ?? 0) > 0 ? $amount : 0.0;
+                $row['uninvoiced'] = $amount - $row['invoiced'];
+            } elseif ($basisId === self::INVOICEBASIS_FIXED) {
+                $line = $fixedLines[$lineId] ?? ['ratio' => 0.0, 'precision' => self::PRECISION_EXACT];
+                $row['precision'] = $line['precision'];
+                if ($line['precision'] !== self::PRECISION_UNMEASURABLE) {
+                    $row['invoiced'] = $amount * $line['ratio'];
+                    $row['uninvoiced'] = max(0.0, $amount - $row['invoiced']);
+                }
+            } elseif ($row['billable']) {
+                // An invoice basis this class does not know: there is no telling what was invoiced.
+                $row['precision'] = self::PRECISION_UNMEASURABLE;
+            }
+
+            $measured[] = $row;
         }
 
-        // FIXED or BUDGETED: check if the project line has been invoiced
-        return $lineId !== null && isset($invoicedLines[$lineId]);
+        return $measured;
     }
 
     /**
-     * Find which offerprojectlines have been invoiced via InvoiceLine.part.
+     * Compare every Fixed project line with what was invoiced on it, over its whole life.
      *
-     * For FIXED and BUDGETED lines, invoicing happens at the line level (not hour level).
-     * This fetches InvoiceLines created in the date range and returns the set of
-     * offerprojectline IDs that have been billed.
+     * Gripp never links an hour on a Fixed line to an invoice line; the invoice line points at
+     * the project line (invoiceline.part) with a quantity. So the only hour-level fact is the
+     * ratio of hours invoiced on the line to hours written on it.
      *
-     * @return array<int, bool> Map of offerprojectline ID => true
+     * @param  int[]  $lineIds
+     * @return array<int, array{ratio: float, precision: string}>
      */
-    private static function resolveInvoicedLines(Collection $hours, string $from, string $to): array
+    private static function resolveFixedLines(array $lineIds): array
     {
-        $lineIds = $hours
-            ->map(fn ($h) => self::resolveId($h['offerprojectline'] ?? null))
-            ->filter()
-            ->unique()
-            ->values()
-            ->all();
-
-        if (empty($lineIds)) {
-            return [];
-        }
-
-        $invoiceLines = self::paginatedQuery('invoiceline', [
-            ['field' => 'invoiceline.part', 'operator' => 'in', 'value' => $lineIds],
-        ]);
-
+        $written = [];
+        $people = [];
         $invoiced = [];
-        foreach ($invoiceLines as $il) {
-            $partId = self::resolveId($il['part'] ?? null);
-            if ($partId !== null) {
-                $invoiced[$partId] = true;
+        $invoicedInOtherUnits = [];
+
+        foreach (array_chunk($lineIds, self::LINE_BATCH_SIZE) as $batch) {
+            $hours = self::paginatedQuery('hour', [
+                ['field' => 'hour.offerprojectline', 'operator' => 'in', 'value' => $batch],
+            ]);
+            foreach ($hours as $hour) {
+                $lineId = self::resolveId($hour['offerprojectline'] ?? null);
+                if ($lineId === null) {
+                    continue;
+                }
+                $amount = (float) ($hour['amount'] ?? 0);
+                $written[$lineId] = ($written[$lineId] ?? 0.0) + $amount;
+
+                $employeeId = self::resolveId($hour['employee'] ?? null);
+                if ($employeeId !== null && $amount > 0) {
+                    $people[$lineId][$employeeId] = true;
+                }
+            }
+
+            $invoiceLines = self::paginatedQuery('invoiceline', [
+                ['field' => 'invoiceline.part', 'operator' => 'in', 'value' => $batch],
+            ]);
+            foreach ($invoiceLines as $invoiceLine) {
+                $lineId = self::resolveId($invoiceLine['part'] ?? null);
+                if ($lineId === null) {
+                    continue;
+                }
+                $quantity = (float) ($invoiceLine['amount'] ?? 0);
+
+                if (self::resolveId($invoiceLine['unit'] ?? null) === self::UNIT_HOUR) {
+                    $invoiced[$lineId] = ($invoiced[$lineId] ?? 0.0) + $quantity;
+                } elseif (abs($quantity * (float) ($invoiceLine['sellingprice'] ?? 0)) > 0.0001) {
+                    // Invoiced as pieces or a price: real invoicing, but not in hours.
+                    $invoicedInOtherUnits[$lineId] = true;
+                }
             }
         }
 
-        return $invoiced;
+        $lines = [];
+        foreach ($lineIds as $lineId) {
+            $hoursWritten = $written[$lineId] ?? 0.0;
+            $hoursInvoiced = $invoiced[$lineId] ?? 0.0;
+
+            $precision = match (true) {
+                isset($invoicedInOtherUnits[$lineId]) => self::PRECISION_UNMEASURABLE,
+                $hoursInvoiced != 0.0 && count($people[$lineId] ?? []) > 1 => self::PRECISION_ESTIMATED,
+                default => self::PRECISION_EXACT,
+            };
+
+            $lines[$lineId] = [
+                'ratio' => $hoursWritten > 0 ? max(0.0, $hoursInvoiced / $hoursWritten) : 0.0,
+                'precision' => $precision,
+            ];
+        }
+
+        return $lines;
+    }
+
+    /** @return array<string, float> */
+    private static function emptyInvoiceabilityTotals(): array
+    {
+        return [
+            'total_hours' => 0.0,
+            'billable_hours' => 0.0,
+            'invoiced_hours' => 0.0,
+            'uninvoiced_hours' => 0.0,
+            'exact_hours' => 0.0,
+            'estimated_hours' => 0.0,
+            'unmeasurable_hours' => 0.0,
+        ];
+    }
+
+    /** @return array<string, array{billable_hours: float, invoiced_hours: float}> */
+    private static function emptyBasisTotals(): array
+    {
+        $empty = ['billable_hours' => 0.0, 'invoiced_hours' => 0.0];
+
+        return ['FIXED' => $empty, 'COSTING' => $empty, 'BUDGETED' => $empty];
+    }
+
+    /**
+     * @param  array<string, mixed>  $totals
+     * @param  array{amount: float, billable: bool, invoiced: float, uninvoiced: float, precision: string}  $measured
+     */
+    private static function addToTotals(array &$totals, array $measured): void
+    {
+        $totals['total_hours'] += $measured['amount'];
+
+        if (! $measured['billable']) {
+            return;
+        }
+
+        $totals['billable_hours'] += $measured['amount'];
+        $totals['invoiced_hours'] += $measured['invoiced'];
+        $totals['uninvoiced_hours'] += $measured['uninvoiced'];
+        $totals[$measured['precision'] . '_hours'] += $measured['amount'];
+    }
+
+    /**
+     * @param  array<string, array{billable_hours: float, invoiced_hours: float}>  $byBasis
+     * @param  array{amount: float, billable: bool, basis: ?string, invoiced: float}  $measured
+     */
+    private static function addToBasis(array &$byBasis, array $measured): void
+    {
+        if (! $measured['billable'] || ! isset($byBasis[$measured['basis']])) {
+            return;
+        }
+
+        $byBasis[$measured['basis']]['billable_hours'] += $measured['amount'];
+        $byBasis[$measured['basis']]['invoiced_hours'] += $measured['invoiced'];
+    }
+
+    /**
+     * Round the hour totals and add the percentage over the measurable billable hours.
+     *
+     * @param  array<string, mixed>  $totals
+     * @return array<string, mixed>
+     */
+    private static function finishTotals(array $totals): array
+    {
+        $measurable = $totals['billable_hours'] - $totals['unmeasurable_hours'];
+
+        return self::roundHours($totals) + [
+            'invoiceability_percentage' => $measurable > 0
+                ? round(($totals['invoiced_hours'] / $measurable) * 100, 1)
+                : 0.0,
+        ];
+    }
+
+    /**
+     * Round every float in a (nested) result to two decimals. Pro rata shares are products of
+     * floats; unrounded they read as 23.999999999999996.
+     *
+     * @param  array<array-key, mixed>  $values
+     * @return array<array-key, mixed>
+     */
+    private static function roundHours(array $values): array
+    {
+        foreach ($values as $key => $value) {
+            if (is_float($value)) {
+                $values[$key] = round($value, 2);
+            } elseif (is_array($value)) {
+                $values[$key] = self::roundHours($value);
+            }
+        }
+
+        return $values;
     }
 
     /**

@@ -15,31 +15,78 @@ class BillabilityTest extends TestCase
         GrippClient::reset();
     }
 
+    /** @var list<array{method: string, filters: array}> */
+    private array $calls = [];
+
+    /**
+     * Fake the Gripp transport. An entry answers calls to its method. An entry with a
+     * 'filter' only answers calls that filter on that field, and wins over a plain one:
+     * invoiceability asks hour.get twice, for the period and for the whole life of the
+     * Fixed lines in it.
+     */
     private function mockTransport(array $callMap): void
     {
+        $this->calls = [];
         $mock = $this->createMock(JsonRpcClient::class);
         $mock->method('paginate')
             ->willReturnCallback(function (string $method, array $params) use ($callMap) {
+                $filters = $params[0] ?? [];
+                $this->calls[] = ['method' => $method, 'filters' => $filters];
+                $fields = array_column($filters, 'field');
+
+                $match = null;
                 foreach ($callMap as $entry) {
-                    if ($entry['method'] === $method) {
-                        return new JsonRpcResponse([
-                            'id' => 1,
-                            'result' => [
-                                'rows' => $entry['rows'],
-                                'count' => count($entry['rows']),
-                                'more_items_in_collection' => false,
-                            ],
-                        ]);
+                    if ($entry['method'] !== $method) {
+                        continue;
                     }
+                    if (isset($entry['filter'])) {
+                        if (in_array($entry['filter'], $fields, true)) {
+                            $match = $entry;
+
+                            break;
+                        }
+
+                        continue;
+                    }
+                    $match ??= $entry;
                 }
 
                 return new JsonRpcResponse([
                     'id' => 1,
-                    'result' => ['rows' => [], 'count' => 0, 'more_items_in_collection' => false],
+                    'result' => [
+                        'rows' => $match['rows'] ?? [],
+                        'count' => count($match['rows'] ?? []),
+                        'more_items_in_collection' => false,
+                    ],
                 ]);
             });
 
         GrippClient::setTransport($mock);
+    }
+
+    /** @return list<string> */
+    private function calledMethods(): array
+    {
+        return array_column($this->calls, 'method');
+    }
+
+    private static function hourRow(int $id, float $amount, int $employee, int $line, ?int $invoiceLine = null, int $project = 99): array
+    {
+        return [
+            'id' => $id,
+            'amount' => $amount,
+            'employee' => ['id' => $employee],
+            'offerprojectbase' => ['id' => $project],
+            'offerprojectline' => ['id' => $line],
+            'status' => ['id' => 3],
+            'invoiceline' => $invoiceLine === null ? null : ['id' => $invoiceLine],
+            'date' => ['date' => '2026-01-05 00:00:00'],
+        ];
+    }
+
+    private static function invoiceLineRow(int $id, int $part, float $amount, int $unit = 1, float $price = 95.0): array
+    {
+        return ['id' => $id, 'part' => ['id' => $part], 'amount' => $amount, 'unit' => ['id' => $unit], 'sellingprice' => $price];
     }
 
     // --- forEmployee ---
@@ -350,143 +397,210 @@ class BillabilityTest extends TestCase
         $this->assertEmpty($result['hours']);
     }
 
-    // --- invoiceabilityForEmployee ---
+    // --- invoiceability: Nacalculatie and Begroot ---
 
-    public function test_invoiceability_for_employee_calculates_correctly(): void
+    public function test_invoiceability_counts_costing_and_budgeted_hours_linked_to_an_invoice_line(): void
     {
         $this->mockTransport([
-            [
-                'method' => 'hour.get',
-                'rows' => [
-                    // Billable + invoiced
-                    ['id' => 1, 'amount' => 8.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 3], 'invoiceline' => ['id' => 5], 'date' => ['date' => '2026-01-05 00:00:00']],
-                    // Billable + NOT invoiced
-                    ['id' => 2, 'amount' => 4.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 2], 'invoiceline' => null, 'date' => ['date' => '2026-01-06 00:00:00']],
-                    // Non-billable (should be excluded from invoiceability)
-                    ['id' => 3, 'amount' => 8.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 101], 'offerprojectline' => ['id' => 11], 'status' => ['id' => 3], 'invoiceline' => null, 'date' => ['date' => '2026-01-07 00:00:00']],
-                ],
-            ],
-            [
-                'method' => 'offerprojectline.get',
-                'rows' => [
-                    ['id' => 10, 'invoicebasis' => ['id' => 2]],
-                    ['id' => 11, 'invoicebasis' => ['id' => 4]],
-                ],
-            ],
+            ['method' => 'hour.get', 'rows' => [
+                // Nacalculatie: 10 hours written, 3 of them on an invoice line.
+                self::hourRow(1, 3.0, 42, 10, invoiceLine: 500),
+                self::hourRow(2, 7.0, 42, 10),
+                // Begroot: 5 hours written, 4 of them invoiced.
+                self::hourRow(3, 4.0, 42, 11, invoiceLine: 501),
+                self::hourRow(4, 1.0, 42, 11),
+                // Not billable, so no part of invoiceability.
+                self::hourRow(5, 8.0, 42, 12),
+            ]],
+            ['method' => 'offerprojectline.get', 'rows' => [
+                ['id' => 10, 'invoicebasis' => ['id' => 2]],
+                ['id' => 11, 'invoicebasis' => ['id' => 3]],
+                ['id' => 12, 'invoicebasis' => ['id' => 4]],
+            ]],
         ]);
 
         $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
 
         $this->assertEquals(42, $result['employee_id']);
-        $this->assertEquals(20.0, $result['total_hours']);
-        $this->assertEquals(12.0, $result['billable_hours']);
-        $this->assertEquals(8.0, $result['invoiced_hours']);
-        $this->assertEquals(4.0, $result['uninvoiced_hours']);
-        // 8 invoiced / 20 total = 40%
-        $this->assertEquals(40.0, $result['invoiceability_percentage']);
+        $this->assertEquals(23.0, $result['total_hours']);
+        $this->assertEquals(15.0, $result['billable_hours']);
+        $this->assertEquals(7.0, $result['invoiced_hours']);
+        $this->assertEquals(8.0, $result['uninvoiced_hours']);
+        $this->assertEquals(15.0, $result['exact_hours']);
+        $this->assertEquals(0.0, $result['estimated_hours']);
+        $this->assertEquals(0.0, $result['unmeasurable_hours']);
+        $this->assertEquals(46.7, $result['invoiceability_percentage']);
+        $this->assertEquals(['billable_hours' => 10.0, 'invoiced_hours' => 3.0], $result['by_invoice_basis']['COSTING']);
+        $this->assertEquals(['billable_hours' => 5.0, 'invoiced_hours' => 4.0], $result['by_invoice_basis']['BUDGETED']);
+        $this->assertEquals(['billable_hours' => 0.0, 'invoiced_hours' => 0.0], $result['by_invoice_basis']['FIXED']);
+        // Without Fixed lines there is nothing to look up per line.
+        $this->assertNotContains('invoiceline.get', $this->calledMethods());
     }
 
-    public function test_invoiceability_for_employee_groups_by_project(): void
+    // --- invoiceability: Fixed ---
+
+    public function test_invoiceability_fixed_line_counts_what_was_invoiced_without_a_cap(): void
+    {
+        // Sold and invoiced 35 hours, worked 10, all by one person.
+        $this->mockTransport([
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => [self::hourRow(1, 10.0, 42, 20)]],
+            ['method' => 'hour.get', 'rows' => [self::hourRow(1, 10.0, 42, 20)]],
+            ['method' => 'offerprojectline.get', 'rows' => [['id' => 20, 'invoicebasis' => ['id' => 1]]]],
+            ['method' => 'invoiceline.get', 'rows' => [self::invoiceLineRow(700, 20, 35.0)]],
+        ]);
+
+        $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
+
+        $this->assertEquals(10.0, $result['billable_hours']);
+        $this->assertEquals(35.0, $result['invoiced_hours']);
+        $this->assertEquals(0.0, $result['uninvoiced_hours']);
+        $this->assertEquals(10.0, $result['exact_hours'], 'one person on the line: the invoiced hours are theirs');
+        $this->assertEquals(350.0, $result['invoiceability_percentage']);
+    }
+
+    public function test_invoiceability_shared_fixed_line_is_split_pro_rata_over_its_whole_life(): void
+    {
+        // Line 30 was invoiced for 40 hours. Over its life employee 42 wrote 30 hours and
+        // employee 43 wrote 20, so each hour on it counts for 0.8 invoiced hours.
+        $this->mockTransport([
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => [
+                self::hourRow(1, 10.0, 42, 30),
+                self::hourRow(2, 20.0, 42, 30),
+                self::hourRow(3, 20.0, 43, 30),
+            ]],
+            // The requested period holds only 10 of employee 42's hours.
+            ['method' => 'hour.get', 'rows' => [self::hourRow(1, 10.0, 42, 30)]],
+            ['method' => 'offerprojectline.get', 'rows' => [['id' => 30, 'invoicebasis' => ['id' => 1]]]],
+            ['method' => 'invoiceline.get', 'rows' => [self::invoiceLineRow(701, 30, 40.0)]],
+        ]);
+
+        $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
+
+        $this->assertEquals(10.0, $result['billable_hours']);
+        $this->assertEquals(8.0, $result['invoiced_hours']);
+        $this->assertEquals(2.0, $result['uninvoiced_hours']);
+        $this->assertEquals(10.0, $result['estimated_hours']);
+        $this->assertEquals(0.0, $result['exact_hours']);
+        $this->assertEquals(80.0, $result['invoiceability_percentage']);
+    }
+
+    public function test_invoiceability_credit_lines_reduce_the_invoiced_hours(): void
     {
         $this->mockTransport([
-            [
-                'method' => 'hour.get',
-                'rows' => [
-                    // FIXED line (invoiced at line level via InvoiceLine.part)
-                    ['id' => 1, 'amount' => 8.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 3], 'invoiceline' => null, 'date' => ['date' => '2026-01-05 00:00:00']],
-                    // COSTING line (not invoiced - no invoiceline on hour)
-                    ['id' => 2, 'amount' => 4.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 101], 'offerprojectline' => ['id' => 12], 'status' => ['id' => 2], 'invoiceline' => null, 'date' => ['date' => '2026-01-06 00:00:00']],
-                ],
-            ],
-            [
-                'method' => 'offerprojectline.get',
-                'rows' => [
-                    ['id' => 10, 'invoicebasis' => ['id' => 1]], // FIXED
-                    ['id' => 12, 'invoicebasis' => ['id' => 2]], // COSTING
-                ],
-            ],
-            [
-                // InvoiceLine.part shows line 10 (FIXED) has been invoiced
-                'method' => 'invoiceline.get',
-                'rows' => [
-                    ['id' => 100, 'part' => ['id' => 10]],
-                ],
-            ],
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => [self::hourRow(1, 60.0, 42, 20)]],
+            ['method' => 'hour.get', 'rows' => [self::hourRow(1, 60.0, 42, 20)]],
+            ['method' => 'offerprojectline.get', 'rows' => [['id' => 20, 'invoicebasis' => ['id' => 1]]]],
+            ['method' => 'invoiceline.get', 'rows' => [
+                self::invoiceLineRow(700, 20, 40.0),
+                self::invoiceLineRow(701, 20, -10.0),
+            ]],
+        ]);
+
+        $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
+
+        $this->assertEquals(30.0, $result['invoiced_hours']);
+        $this->assertEquals(50.0, $result['invoiceability_percentage']);
+    }
+
+    public function test_invoiceability_fixed_line_never_invoiced_is_exactly_zero(): void
+    {
+        $this->mockTransport([
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => [
+                self::hourRow(1, 8.0, 42, 20),
+                self::hourRow(2, 4.0, 43, 20),
+            ]],
+            ['method' => 'hour.get', 'rows' => [self::hourRow(1, 8.0, 42, 20)]],
+            ['method' => 'offerprojectline.get', 'rows' => [['id' => 20, 'invoicebasis' => ['id' => 1]]]],
+            ['method' => 'invoiceline.get', 'rows' => []],
+        ]);
+
+        $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
+
+        $this->assertEquals(0.0, $result['invoiced_hours']);
+        $this->assertEquals(8.0, $result['uninvoiced_hours']);
+        $this->assertEquals(8.0, $result['exact_hours'], 'nothing invoiced is certain, even on a shared line');
+        $this->assertEquals(0.0, $result['invoiceability_percentage']);
+    }
+
+    public function test_invoiceability_fixed_line_invoiced_in_other_units_is_unmeasurable(): void
+    {
+        // Line 40 is Fixed and invoiced as one piece; line 10 is Nacalculatie with 2 hours invoiced.
+        $this->mockTransport([
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => [self::hourRow(1, 8.0, 42, 40)]],
+            ['method' => 'hour.get', 'rows' => [
+                self::hourRow(1, 8.0, 42, 40),
+                self::hourRow(2, 2.0, 42, 10, invoiceLine: 500),
+            ]],
+            ['method' => 'offerprojectline.get', 'rows' => [
+                ['id' => 40, 'invoicebasis' => ['id' => 1]],
+                ['id' => 10, 'invoicebasis' => ['id' => 2]],
+            ]],
+            ['method' => 'invoiceline.get', 'rows' => [
+                self::invoiceLineRow(702, 40, 1.0, unit: 3, price: 5000.0),
+                // A text line without a unit or a price is not invoicing.
+                ['id' => 703, 'part' => ['id' => 40], 'amount' => 1.0, 'unit' => null, 'sellingprice' => 0.0],
+            ]],
+        ]);
+
+        $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
+
+        $this->assertEquals(10.0, $result['billable_hours']);
+        $this->assertEquals(8.0, $result['unmeasurable_hours']);
+        $this->assertEquals(2.0, $result['invoiced_hours']);
+        $this->assertEquals(0.0, $result['uninvoiced_hours']);
+        // 2 invoiced of the 2 measurable hours; the piece-priced line is left out.
+        $this->assertEquals(100.0, $result['invoiceability_percentage']);
+    }
+
+    public function test_invoiceability_groups_by_project(): void
+    {
+        $this->mockTransport([
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => [self::hourRow(1, 8.0, 42, 20, project: 99)]],
+            ['method' => 'hour.get', 'rows' => [
+                self::hourRow(1, 8.0, 42, 20, project: 99),
+                self::hourRow(2, 4.0, 42, 10, project: 101),
+            ]],
+            ['method' => 'offerprojectline.get', 'rows' => [
+                ['id' => 20, 'invoicebasis' => ['id' => 1]],
+                ['id' => 10, 'invoicebasis' => ['id' => 2]],
+            ]],
+            ['method' => 'invoiceline.get', 'rows' => [self::invoiceLineRow(700, 20, 8.0)]],
         ]);
 
         $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
 
         $this->assertCount(2, $result['by_project']);
-        // Project 99: FIXED line invoiced via InvoiceLine.part
-        $this->assertEquals(99, $result['by_project'][0]['offerprojectbase_id']);
-        $this->assertEquals(8.0, $result['by_project'][0]['invoiced_hours']);
-        $this->assertEquals(0.0, $result['by_project'][0]['uninvoiced_hours']);
-        // Project 101: COSTING line not invoiced (no hour.invoiceline)
-        $this->assertEquals(101, $result['by_project'][1]['offerprojectbase_id']);
-        $this->assertEquals(0.0, $result['by_project'][1]['invoiced_hours']);
-        $this->assertEquals(4.0, $result['by_project'][1]['uninvoiced_hours']);
+        $this->assertEquals(['offerprojectbase_id' => 99, 'billable_hours' => 8.0, 'invoiced_hours' => 8.0, 'uninvoiced_hours' => 0.0], $result['by_project'][0]);
+        $this->assertEquals(['offerprojectbase_id' => 101, 'billable_hours' => 4.0, 'invoiced_hours' => 0.0, 'uninvoiced_hours' => 4.0], $result['by_project'][1]);
     }
 
-    public function test_invoiceability_fixed_and_budgeted_use_line_level_invoicing(): void
+    public function test_invoiceability_looks_up_fixed_lines_in_batches(): void
     {
+        $hours = [];
+        $lines = [];
+        foreach (range(1, 150) as $i) {
+            $hours[] = self::hourRow($i, 1.0, 42, 1000 + $i);
+            $lines[] = ['id' => 1000 + $i, 'invoicebasis' => ['id' => 1]];
+        }
         $this->mockTransport([
-            [
-                'method' => 'hour.get',
-                'rows' => [
-                    // FIXED line - hour has no invoiceline (normal for FIXED)
-                    ['id' => 1, 'amount' => 8.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 3], 'invoiceline' => null, 'date' => ['date' => '2026-01-05 00:00:00']],
-                    // BUDGETED line - hour has no invoiceline (normal for BUDGETED)
-                    ['id' => 2, 'amount' => 4.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 11], 'status' => ['id' => 2], 'invoiceline' => null, 'date' => ['date' => '2026-01-06 00:00:00']],
-                    // COSTING line - hour HAS invoiceline (hour-level billing)
-                    ['id' => 3, 'amount' => 2.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 12], 'status' => ['id' => 3], 'invoiceline' => ['id' => 50], 'date' => ['date' => '2026-01-07 00:00:00']],
-                    // COSTING line - NOT invoiced
-                    ['id' => 4, 'amount' => 2.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 12], 'status' => ['id' => 2], 'invoiceline' => null, 'date' => ['date' => '2026-01-08 00:00:00']],
-                ],
-            ],
-            [
-                'method' => 'offerprojectline.get',
-                'rows' => [
-                    ['id' => 10, 'invoicebasis' => ['id' => 1]], // FIXED
-                    ['id' => 11, 'invoicebasis' => ['id' => 3]], // BUDGETED
-                    ['id' => 12, 'invoicebasis' => ['id' => 2]], // COSTING
-                ],
-            ],
-            [
-                // Only FIXED line 10 has been invoiced; BUDGETED line 11 has not
-                'method' => 'invoiceline.get',
-                'rows' => [
-                    ['id' => 200, 'part' => ['id' => 10]],
-                ],
-            ],
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => $hours],
+            ['method' => 'hour.get', 'rows' => $hours],
+            ['method' => 'offerprojectline.get', 'rows' => $lines],
         ]);
 
-        $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
+        Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
 
-        // All 16h are billable (FIXED 8 + BUDGETED 4 + COSTING 4)
-        $this->assertEquals(16.0, $result['billable_hours']);
-        // Invoiced: FIXED 8h (line-level) + COSTING 2h (hour-level) = 10h
-        $this->assertEquals(10.0, $result['invoiced_hours']);
-        // Uninvoiced: BUDGETED 4h (line not invoiced) + COSTING 2h (no hour.invoiceline) = 6h
-        $this->assertEquals(6.0, $result['uninvoiced_hours']);
-        // 10 invoiced / 16 total = 62.5%
-        $this->assertEquals(62.5, $result['invoiceability_percentage']);
+        $invoiceLineCalls = array_values(array_filter($this->calls, fn (array $call) => $call['method'] === 'invoiceline.get'));
+        $this->assertCount(2, $invoiceLineCalls);
+        $this->assertCount(100, $invoiceLineCalls[0]['filters'][0]['value']);
+        $this->assertCount(50, $invoiceLineCalls[1]['filters'][0]['value']);
     }
 
     public function test_invoiceability_for_employee_with_zero_billable_hours(): void
     {
         $this->mockTransport([
-            [
-                'method' => 'hour.get',
-                'rows' => [
-                    ['id' => 1, 'amount' => 8.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 1], 'invoiceline' => null, 'date' => ['date' => '2026-01-05 00:00:00']],
-                ],
-            ],
-            [
-                'method' => 'offerprojectline.get',
-                'rows' => [
-                    ['id' => 10, 'invoicebasis' => ['id' => 4]],
-                ],
-            ],
+            ['method' => 'hour.get', 'rows' => [self::hourRow(1, 8.0, 42, 10)]],
+            ['method' => 'offerprojectline.get', 'rows' => [['id' => 10, 'invoicebasis' => ['id' => 4]]]],
         ]);
 
         $result = Billability::invoiceabilityForEmployee(42, '2026-01-01', '2026-01-31');
@@ -498,57 +612,37 @@ class BillabilityTest extends TestCase
 
     // --- invoiceabilityForTeam ---
 
-    public function test_invoiceability_for_team_aggregates_employees(): void
+    public function test_invoiceability_for_team_splits_a_shared_fixed_line_between_employees(): void
     {
+        $lineHours = [self::hourRow(1, 30.0, 42, 30), self::hourRow(2, 20.0, 43, 30)];
         $this->mockTransport([
-            [
-                'method' => 'hour.get',
-                'rows' => [
-                    // Employee 42: billable + invoiced
-                    ['id' => 1, 'amount' => 8.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 3], 'invoiceline' => ['id' => 5], 'date' => ['date' => '2026-01-05 00:00:00']],
-                    // Employee 42: billable + NOT invoiced
-                    ['id' => 2, 'amount' => 4.0, 'employee' => ['id' => 42], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 2], 'invoiceline' => null, 'date' => ['date' => '2026-01-06 00:00:00']],
-                    // Employee 43: billable + invoiced
-                    ['id' => 3, 'amount' => 6.0, 'employee' => ['id' => 43], 'offerprojectbase' => ['id' => 99], 'offerprojectline' => ['id' => 10], 'status' => ['id' => 3], 'invoiceline' => ['id' => 6], 'date' => ['date' => '2026-01-07 00:00:00']],
-                    // Employee 43: non-billable (excluded)
-                    ['id' => 4, 'amount' => 2.0, 'employee' => ['id' => 43], 'offerprojectbase' => ['id' => 101], 'offerprojectline' => ['id' => 11], 'status' => ['id' => 3], 'invoiceline' => null, 'date' => ['date' => '2026-01-08 00:00:00']],
-                ],
-            ],
-            [
-                'method' => 'offerprojectline.get',
-                'rows' => [
-                    ['id' => 10, 'invoicebasis' => ['id' => 2]],
-                    ['id' => 11, 'invoicebasis' => ['id' => 4]],
-                ],
-            ],
+            ['method' => 'hour.get', 'filter' => 'hour.offerprojectline', 'rows' => $lineHours],
+            ['method' => 'hour.get', 'rows' => [...$lineHours, self::hourRow(3, 5.0, 43, 10, invoiceLine: 500)]],
+            ['method' => 'offerprojectline.get', 'rows' => [
+                ['id' => 30, 'invoicebasis' => ['id' => 1]],
+                ['id' => 10, 'invoicebasis' => ['id' => 2]],
+            ]],
+            ['method' => 'invoiceline.get', 'rows' => [self::invoiceLineRow(701, 30, 40.0)]],
         ]);
 
         $result = Billability::invoiceabilityForTeam('2026-01-01', '2026-01-31', [42, 43]);
 
-        $this->assertEquals(20.0, $result['total_hours']);
-        $this->assertEquals(18.0, $result['billable_hours']);
-        $this->assertEquals(14.0, $result['invoiced_hours']);
-        $this->assertEquals(4.0, $result['uninvoiced_hours']);
-        // 14 invoiced / 20 total = 70%
-        $this->assertEquals(70.0, $result['invoiceability_percentage']);
+        // The 40 Fixed hours split 24 / 16, plus 5 invoiced Nacalculatie hours of employee 43.
+        $this->assertEquals(55.0, $result['billable_hours']);
+        $this->assertEquals(45.0, $result['invoiced_hours']);
+        $this->assertEquals(50.0, $result['estimated_hours']);
+        $this->assertEquals(5.0, $result['exact_hours']);
+        $this->assertEquals(81.8, $result['invoiceability_percentage']);
 
         $this->assertCount(2, $result['by_employee']);
-
-        // Employee 42: 8 invoiced / 12 total = 66.7%
-        $emp42 = $result['by_employee'][0];
-        $this->assertEquals(42, $emp42['employee_id']);
-        $this->assertEquals(12.0, $emp42['total_hours']);
-        $this->assertEquals(12.0, $emp42['billable_hours']);
-        $this->assertEquals(8.0, $emp42['invoiced_hours']);
-        $this->assertEquals(66.7, $emp42['invoiceability_percentage']);
-
-        // Employee 43: 6 invoiced / 8 total = 75%
-        $emp43 = $result['by_employee'][1];
-        $this->assertEquals(43, $emp43['employee_id']);
-        $this->assertEquals(8.0, $emp43['total_hours']);
-        $this->assertEquals(6.0, $emp43['billable_hours']);
-        $this->assertEquals(6.0, $emp43['invoiced_hours']);
-        $this->assertEquals(75.0, $emp43['invoiceability_percentage']);
+        [$first, $second] = $result['by_employee'];
+        $this->assertEquals(42, $first['employee_id']);
+        $this->assertEquals(30.0, $first['billable_hours']);
+        $this->assertEquals(24.0, $first['invoiced_hours']);
+        $this->assertEquals(80.0, $first['invoiceability_percentage']);
+        $this->assertEquals(43, $second['employee_id']);
+        $this->assertEquals(21.0, $second['invoiced_hours']);
+        $this->assertEquals(84.0, $second['invoiceability_percentage']);
     }
 
     public function test_invoiceability_for_team_with_zero_hours(): void
