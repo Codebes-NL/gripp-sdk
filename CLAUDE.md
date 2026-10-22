@@ -48,6 +48,7 @@ src/
 - **Transport hooks:** `beforeRequest(callback)` fires before each HTTP call (throw to abort). `onRateLimitExceeded(callback)` fires on 429/503-1004 before the SDK throws.
 - **Rate limit tracking:** `getRateLimitRemaining()` and `getRateLimitLimit()` expose values from `X-RateLimit-*` response headers.
 - **503 with error_code 1004** is treated as a rate limit (Gripp's short-burst throttle), not a server error.
+- **A 200 that is not JSON-RPC throws `RequestException`.** During an outage `api.gripp.com` serves Exact's status page JSON with HTTP 200. Every item must carry `result` or `error`; anything else used to read as zero rows, and every consumer's sync reported success. It is not retried: an outage lasts hours, not seconds.
 
 ## Filter Operators
 

@@ -246,6 +246,16 @@ class JsonRpcClient
                 throw $this->buildRequestException($errorData);
             }
 
+            // During an outage api.gripp.com answers 200 with Exact's status page JSON.
+            // Returned as-is, that reads as zero rows and a sync reports success.
+            if (! $this->isJsonRpcResponse($body)) {
+                throw new RequestException(
+                    'Unexpected response from API, not JSON-RPC: ' . substr($rawBody, 0, 200),
+                    is_array($body) ? $body : null,
+                    $response->getStatusCode()
+                );
+            }
+
             return $body;
 
         } catch (GuzzleRequestException $e) {
@@ -347,6 +357,26 @@ class JsonRpcClient
         if ($limit !== '') {
             $this->rateLimitLimit = (int) $limit;
         }
+    }
+
+    /**
+     * A batch of items, or a single object, that each carry `result` or `error`.
+     */
+    protected function isJsonRpcResponse(mixed $body): bool
+    {
+        if (! is_array($body) || $body === []) {
+            return false;
+        }
+
+        $items = array_is_list($body) ? $body : [$body];
+
+        foreach ($items as $item) {
+            if (! is_array($item) || ! (array_key_exists('result', $item) || array_key_exists('error', $item))) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     protected function buildRequestException(mixed $errorData): RequestException

@@ -12,6 +12,7 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Middleware;
 use GuzzleHttp\Psr7\Response;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class JsonRpcClientTest extends TestCase
@@ -321,5 +322,96 @@ class JsonRpcClientTest extends TestCase
 
         $this->assertEquals(1, $body1[0]['id']);
         $this->assertEquals(2, $body2[0]['id']);
+    }
+
+    public function test_throws_on_status_page_served_during_an_outage(): void
+    {
+        // Trimmed from what api.gripp.com answered, with HTTP 200, on 22 October 2026.
+        $client = $this->createClient([
+            new Response(200, [], json_encode([
+                'page' => ['id' => 'mr76vvnwb7ph', 'name' => 'Exact System', 'url' => 'https://status.exact.com'],
+                'status' => ['indicator' => 'major', 'description' => 'Partial System Outage'],
+                'components' => [['name' => 'Exact Gripp', 'status' => 'major_outage']],
+            ])),
+        ]);
+
+        try {
+            $client->call('task.get', []);
+            $this->fail('Expected RequestException');
+        } catch (RequestException $e) {
+            $this->assertStringContainsString('not JSON-RPC', $e->getMessage());
+            $this->assertStringContainsString('Exact System', $e->getMessage());
+            $this->assertSame(200, $e->getCode());
+            $this->assertSame('major', $e->getResponseData()['status']['indicator']);
+        }
+    }
+
+    public function test_status_page_is_not_retried(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], json_encode(['status' => ['indicator' => 'major']])),
+            $this->singleResponse(['rows' => [['id' => 1]]]),
+        ]);
+
+        try {
+            $client->call('task.get', []);
+            $this->fail('Expected RequestException');
+        } catch (RequestException) {
+            $this->assertCount(1, $this->history);
+        }
+    }
+
+    public function test_pagination_throws_instead_of_returning_no_rows_on_a_status_page(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], json_encode(['status' => ['indicator' => 'major']])),
+        ]);
+
+        $this->expectException(RequestException::class);
+        $client->paginate('task.get', [[], []]);
+    }
+
+    /**
+     * @return array<string, array{string}>
+     */
+    public static function nonJsonRpcBodies(): array
+    {
+        return [
+            'empty batch' => ['[]'],
+            'json null' => ['null'],
+            'json string' => ['"maintenance"'],
+            'item without result or error' => ['[{"id": 1}]'],
+            'second item without result' => ['[{"id": 1, "result": []}, {"id": 2}]'],
+        ];
+    }
+
+    #[DataProvider('nonJsonRpcBodies')]
+    public function test_throws_on_any_body_that_is_not_json_rpc(string $body): void
+    {
+        $client = $this->createClient([new Response(200, [], $body)]);
+
+        $this->expectException(RequestException::class);
+        $this->expectExceptionMessage('not JSON-RPC');
+        $client->call('task.get', []);
+    }
+
+    public function test_accepts_a_null_result(): void
+    {
+        $client = $this->createClient([
+            $this->batchResponse([['id' => 1, 'result' => null]]),
+        ]);
+
+        $response = $client->call('task.delete', [1]);
+
+        $this->assertNull($response->result());
+    }
+
+    public function test_accepts_a_non_batch_response(): void
+    {
+        $client = $this->createClient([
+            new Response(200, [], json_encode(['id' => 1, 'result' => ['rows' => [['id' => 7]]]])),
+        ]);
+
+        $this->assertSame([['id' => 7]], $client->call('task.get', [])->rows());
     }
 }

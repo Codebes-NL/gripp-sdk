@@ -287,12 +287,16 @@ try {
     $retryAfter = $e->getRetryAfter(); // seconds to wait
     $remaining = $e->getRemaining();   // remaining requests
 } catch (RequestException $e) {
-    // Other API errors
+    // Other API errors, including a body that is not JSON-RPC
     $data = $e->getResponseData(); // raw error response
 } catch (GrippException $e) {
     // Base exception for all SDK errors (e.g. not configured)
 }
 ```
+
+A response that is valid JSON but not JSON-RPC also throws `RequestException`. During an outage
+`api.gripp.com` answers HTTP 200 with Exact's status page; before this check that came back as zero
+rows, so a sync reported success while fetching nothing.
 
 ## Available Resources
 
